@@ -10,6 +10,7 @@ import spray.http.StatusCodes
 import spray.httpx.SprayJsonSupport._
 import spray.routing._
 
+import scala.collection.immutable.Map
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
@@ -91,9 +92,11 @@ trait RestApi extends HttpService with ActorLogging {
 
   implicit val timeout = Timeout(50 seconds)
 
-  var quizzes = Vector[Quiz]()
+//  var quizzes = Vector[Quiz]()
 
   var users = Vector[User]()
+  var posts: Map[String, Post] = new scala.collection.immutable
+  .HashMap[String, Post]
 
   print(users)
 
@@ -136,6 +139,17 @@ trait RestApi extends HttpService with ActorLogging {
               .getOrElse(responder ! ProfileNotFound)
           }
         }
+      } ~
+      pathEnd {
+        post {
+          entity(as[Post]) { post => requestContext =>
+            val responder = createResponder(requestContext)
+            createPost(post)
+            responder ! PostCreated
+//              case _ => responder ! ProfileAlreadyExists
+
+          }
+        }
       }
 
   private def createResponder(requestContext: RequestContext) = {
@@ -143,41 +157,45 @@ trait RestApi extends HttpService with ActorLogging {
     context.actorOf(Props(new Responder(requestContext)))
   }
 
-  private def createQuiz(quiz: Quiz): Boolean = {
+//  private def createQuiz(quiz: Quiz): Boolean = {
+//
+//    val doesNotExist = !quizzes.exists(_.id == quiz.id)
+//    if (doesNotExist) {
+//      quizzes = quizzes :+ quiz
+//      print(quizzes)
+//    }
+//    doesNotExist
+//  }
 
-    val doesNotExist = !quizzes.exists(_.id == quiz.id)
+  private def createProfile(user: User): Boolean = {
+
+    val doesNotExist = !users.exists(_.id == user.id)
     if (doesNotExist) {
-      quizzes = quizzes :+ quiz
-      print(quizzes)
-    }
-    doesNotExist
-  }
-
-  private def createProfile(profile: User): Boolean = {
-
-    val doesNotExist = !users.exists(_.id == profile.id)
-    if (doesNotExist) {
-      users = users :+ profile
+      users = users :+ user
       print(users)
     }
     doesNotExist
   }
 
-  private def deleteQuiz(id: String): Unit = {
-
-    quizzes = quizzes.filterNot(_.id == id)
+  private def createPost(post: Post): Unit = {
+    posts+(post.postID -> post)
   }
 
-  private def getRandomQuestion: Option[Question] = {
-
-    !quizzes.isEmpty match {
-      case true =>
-        import scala.util.Random
-        val idx = (new Random).nextInt(quizzes.size)
-        Some(quizzes(idx))
-      case _ => None
-    }
-  }
+//  private def deleteQuiz(id: String): Unit = {
+//
+//    quizzes = quizzes.filterNot(_.id == id)
+//  }
+//
+//  private def getRandomQuestion: Option[Question] = {
+//
+//    !quizzes.isEmpty match {
+//      case true =>
+//        import scala.util.Random
+//        val idx = (new Random).nextInt(quizzes.size)
+//        Some(quizzes(idx))
+//      case _ => None
+//    }
+//  }
 
   private def getUser(id: String): Option[User] = {
 
@@ -199,20 +217,20 @@ trait RestApi extends HttpService with ActorLogging {
     users.find(_.id == id)
   }
 
-  private def getQuestion(id: String): Option[Question] = {
-
-    getQuiz(id).map(toQuestion)
-  }
-
-  private def getQuiz(id: String): Option[Quiz] = {
-
-    quizzes.find(_.id == id)
-  }
-
-  private def isAnswerCorrect(id: String, proposedAnswer: Answer): Boolean = {
-
-    getQuiz(id).exists(_.correctAnswer == proposedAnswer.answer)
-  }
+//  private def getQuestion(id: String): Option[Question] = {
+//
+//    getQuiz(id).map(toQuestion)
+//  }
+//
+//  private def getQuiz(id: String): Option[Quiz] = {
+//
+//    quizzes.find(_.id == id)
+//  }
+//
+//  private def isAnswerCorrect(id: String, proposedAnswer: Answer): Boolean = {
+//
+//    getQuiz(id).exists(_.correctAnswer == proposedAnswer.answer)
+//  }
 }
 
 class Responder(requestContext: RequestContext) extends Actor with ActorLogging {
@@ -221,29 +239,33 @@ class Responder(requestContext: RequestContext) extends Actor with ActorLogging 
 
   def receive = {
 
-    case QuizCreated =>
-      requestContext.complete(StatusCodes.Created)
-      killYourself
+//    case QuizCreated =>
+//      requestContext.complete(StatusCodes.Created)
+//      killYourself
 
     case ProfileCreated =>
       requestContext.complete(StatusCodes.Created)
       killYourself
 
-    case QuizDeleted =>
-      requestContext.complete(StatusCodes.OK)
+    case PostCreated =>
+      requestContext.complete(StatusCodes.Created)
       killYourself
 
-    case QuizAlreadyExists =>
-      requestContext.complete(StatusCodes.Conflict)
-      killYourself
+//    case QuizDeleted =>
+//      requestContext.complete(StatusCodes.OK)
+//      killYourself
+
+//    case QuizAlreadyExists =>
+//      requestContext.complete(StatusCodes.Conflict)
+//      killYourself
 
     case ProfileAlreadyExists =>
       requestContext.complete(StatusCodes.Conflict)
       killYourself
 
-    case question: Question =>
-      requestContext.complete(StatusCodes.OK, question)
-      killYourself
+//    case question: Question =>
+//      requestContext.complete(StatusCodes.OK, question)
+//      killYourself
 
     case user: User =>
       requestContext.complete(StatusCodes.OK, user)
@@ -257,21 +279,21 @@ class Responder(requestContext: RequestContext) extends Actor with ActorLogging 
       requestContext.complete(StatusCodes.OK, timeline)
       killYourself
 
-    case QuestionNotFound =>
-      requestContext.complete(StatusCodes.NotFound)
-      killYourself
+//    case QuestionNotFound =>
+//      requestContext.complete(StatusCodes.NotFound)
+//      killYourself
 
     case ProfileNotFound =>
       requestContext.complete(StatusCodes.NotFound)
       killYourself
 
-    case CorrectAnswer =>
-      requestContext.complete(StatusCodes.OK)
-      killYourself
-
-    case WrongAnswer =>
-      requestContext.complete(StatusCodes.NotFound)
-      killYourself
+//    case CorrectAnswer =>
+//      requestContext.complete(StatusCodes.OK)
+//      killYourself
+//
+//    case WrongAnswer =>
+//      requestContext.complete(StatusCodes.NotFound)
+//      killYourself
   }
 
   private def killYourself = self ! PoisonPill

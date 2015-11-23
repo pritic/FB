@@ -62,6 +62,23 @@ object Client {
       client ! GetProfile("user" + i)
       client ! GetTimeline("user" + i)
     }
+
+
+  }
+
+  implicit object AnyJsonFormat extends JsonFormat[Any] {
+    def write(x: Any) = x match {
+      case n: Int => JsNumber(n)
+      case s: String => JsString(s)
+      case b: Boolean if b => JsTrue
+      case b: Boolean if !b => JsFalse
+    }
+    def read(value: JsValue) = value match {
+      case JsNumber(n) => n.intValue()
+      case JsString(s) => s
+      case JsTrue => true
+      case JsFalse => false
+    }
   }
 
   class FBUser(
@@ -76,14 +93,14 @@ object Client {
     val id: String = userID
     var username: String = name
     var about: String = aboutMe
-    var postList: Set[String] = new scala.collection.immutable.HashSet[String]
+    var postList: HashMap[String, Post] = new scala.collection.immutable
+    .HashMap[String, Post]
     var friendList: Set[String] = new scala.collection.immutable
     .HashSet[String]
 
     //    postList.add("i am a post")
     //    friendList.add("i am a friend")
 
-    postList += "i am a post"
     friendList += "i am a friend"
 
     def receive: Receive = {
@@ -126,6 +143,25 @@ object Client {
 
 
         println("responseTimeline: " + response)
+
+      case PostMessageToFriend(friendID: String, content: String,
+      privacy: String) =>
+        val post = new Post("pp1", id, friendID, privacy, content)
+
+        postList + ("pp1" -> post)
+
+        val postJSON = new Post("pp1", id, friendID, privacy, content)
+          .toJson
+
+        implicit val timeout = Timeout(10 seconds)
+
+        val future = IO(Http)(system).ask(HttpRequest(POST, Uri(s"http://" +
+          serverIP + ":" + serverPort + "/post")).withEntity(HttpEntity(ContentType(MediaTypes.`application/json`), postJSON.toString()))).mapTo[HttpResponse]
+
+        val response = Await.result(future, timeout.duration)
+
+
+        println("responseTimeline: " + response)
     }
   }
 
@@ -136,3 +172,7 @@ case class CreateUser()
 case class GetProfile(id: String)
 
 case class GetTimeline(id: String)
+
+case class PostMessageToFriend(
+                                friendID: String, content: String,
+                                privacy: String)
