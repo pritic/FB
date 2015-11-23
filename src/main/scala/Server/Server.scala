@@ -61,10 +61,6 @@ object Server {
 
     val master = system.actorOf(Props(new RestInterface()), "httpInterface")
 
-//        implicit val system = ActorSystem("Facebook-api")
-
-    //    val api = system.actorOf(Props(new RestInterface()), "httpInterface")
-
     implicit val executionContext = system.dispatcher
     implicit val timeout = Timeout(10 seconds)
 
@@ -91,68 +87,46 @@ class RestInterface extends HttpServiceActor with RestApi {
 trait RestApi extends HttpService with ActorLogging {
   actor: Actor =>
 
-  //  import com.danielasfregola.quiz.management.QuizProtocol._
   import Common.Common._
 
   implicit val timeout = Timeout(50 seconds)
 
   var quizzes = Vector[Quiz]()
 
-  var profiles = Vector[Profile]()
-  for (i <- 1 until 10) {
-    val profile = new Profile("id" + i.toString, "name" + i.toString,
-      "aboutsection" + i.toString)
-    profiles = profiles :+ profile
-  }
+  var users = Vector[User]()
 
-  print(profiles)
+  print(users)
 
   def routes: Route =
 
-    pathPrefix("quizzes") {
-      pathEnd {
-        post {
-          entity(as[Quiz]) { quiz => requestContext =>
-            val responder = createResponder(requestContext)
-            createQuiz(quiz) match {
-              case true => responder ! QuizCreated
-              case _ => responder ! QuizAlreadyExists
+    pathPrefix("user") {
+      path(Segment) { id =>
+        get { requestContext =>
+          val responder = createResponder(requestContext)
+          getUser(id).map(responder ! _)
+            .getOrElse(responder ! ProfileNotFound)
+        }
+      } ~
+        pathEnd {
+          post {
+            entity(as[User]) { profile => requestContext =>
+              val responder = createResponder(requestContext)
+              createProfile(profile) match {
+                case true => responder ! ProfileCreated
+                case _ => responder ! ProfileAlreadyExists
+              }
             }
           }
         }
-      } ~
-        path(Segment) { id =>
-          delete { requestContext =>
-            val responder = createResponder(requestContext)
-            deleteQuiz(id)
-            responder ! QuizDeleted
-          }
-        }
     } ~
-      pathPrefix("questions") {
-        pathEnd {
+      pathPrefix("timeline") {
+        path(Segment) { id =>
           get { requestContext =>
             val responder = createResponder(requestContext)
-            getRandomQuestion.map(responder ! _)
-              .getOrElse(responder ! QuestionNotFound)
+            getTimeline(id).map(responder ! _)
+              .getOrElse(responder ! ProfileNotFound)
           }
-        } ~
-          path(Segment) { id =>
-            get { requestContext =>
-              val responder = createResponder(requestContext)
-              getQuestion(id).map(responder ! _)
-                .getOrElse(responder ! QuestionNotFound)
-            } ~
-              put {
-                entity(as[Answer]) { answer => requestContext =>
-                  val responder = createResponder(requestContext)
-                  isAnswerCorrect(id, answer) match {
-                    case true => responder ! CorrectAnswer
-                    case _ => responder ! WrongAnswer
-                  }
-                }
-              }
-          }
+        }
       } ~
       pathPrefix("profile") {
         path(Segment) { id =>
@@ -161,18 +135,7 @@ trait RestApi extends HttpService with ActorLogging {
             getProfile(id).map(responder ! _)
               .getOrElse(responder ! ProfileNotFound)
           }
-        } ~
-          pathEnd {
-            post {
-              entity(as[Profile]) { profile => requestContext =>
-                val responder = createResponder(requestContext)
-                createProfile(profile) match {
-                  case true => responder ! ProfileCreated
-                  case _ => responder ! ProfileAlreadyExists
-                }
-              }
-            }
-          }
+        }
       }
 
   private def createResponder(requestContext: RequestContext) = {
@@ -190,12 +153,12 @@ trait RestApi extends HttpService with ActorLogging {
     doesNotExist
   }
 
-  private def createProfile(profile: Profile): Boolean = {
+  private def createProfile(profile: User): Boolean = {
 
-    val doesNotExist = !profiles.exists(_.id == profile.id)
+    val doesNotExist = !users.exists(_.id == profile.id)
     if (doesNotExist) {
-      profiles = profiles :+ profile
-      print(profiles)
+      users = users :+ profile
+      print(users)
     }
     doesNotExist
   }
@@ -216,16 +179,24 @@ trait RestApi extends HttpService with ActorLogging {
     }
   }
 
-  private def getProfile(id: String): Option[Profile] = {
+  private def getUser(id: String): Option[User] = {
 
-    print("in getProfile")
-    getProfileID(id).map(toProfile)
+    getUserID(id).map(toUser)
   }
 
-  private def getProfileID(id: String): Option[Profile] = {
+  private def getProfile(id: String): Option[Profile] = {
 
-    print("in getProfileID")
-    profiles.find(_.id == id)
+    getUserID(id).map(toProfile)
+  }
+
+  private def getTimeline(id: String): Option[TimeLine] = {
+
+    getUserID(id).map(toTimeline)
+  }
+
+  private def getUserID(id: String): Option[User] = {
+
+    users.find(_.id == id)
   }
 
   private def getQuestion(id: String): Option[Question] = {
@@ -246,7 +217,6 @@ trait RestApi extends HttpService with ActorLogging {
 
 class Responder(requestContext: RequestContext) extends Actor with ActorLogging {
 
-  //  import com.danielasfregola.quiz.management.QuizProtocol._
   import Common.Common._
 
   def receive = {
@@ -275,8 +245,16 @@ class Responder(requestContext: RequestContext) extends Actor with ActorLogging 
       requestContext.complete(StatusCodes.OK, question)
       killYourself
 
+    case user: User =>
+      requestContext.complete(StatusCodes.OK, user)
+      killYourself
+
     case profile: Profile =>
       requestContext.complete(StatusCodes.OK, profile)
+      killYourself
+
+    case timeline: TimeLine =>
+      requestContext.complete(StatusCodes.OK, timeline)
       killYourself
 
     case QuestionNotFound =>

@@ -1,21 +1,28 @@
 package Common
 
+import spray.json._
+
 /**
   * Created by Priti Changlani on 11/22/15 at 4:52 PM.
   */
 object Common {
 
-  case class Profile(id: String, username: String, about: String)
+  case class User(
+                      id: String,
+                      username: String,
+                      about: String,
+                      postList: scala.collection.immutable.Set[String],
+                      friendList: scala.collection.immutable.Set[String]
+                    )
+
+  case class Profile (username: String, about:String,friendList: scala.collection.immutable.Set[String] )
+  case class TimeLine(username:String, postList:scala.collection.immutable.Set[String])
 
   case object ProfileNotFound
 
-  import spray.json._
+  case object ProfileCreated
 
-  //  case class Profile (id: String, username: String, about: String)
-  //
-    case object ProfileCreated
-
-    case object ProfileAlreadyExists
+  case object ProfileAlreadyExists
 
   case class Quiz(id: String, question: String, correctAnswer: String)
 
@@ -52,9 +59,19 @@ object Common {
     implicit val format = jsonFormat1(Answer.apply)
   }
 
+  object User extends DefaultJsonProtocol {
+
+    implicit val format = jsonFormat5(User.apply)
+  }
+
   object Profile extends DefaultJsonProtocol {
 
     implicit val format = jsonFormat3(Profile.apply)
+  }
+
+  object TimeLine extends DefaultJsonProtocol {
+
+    implicit val format = jsonFormat2(TimeLine.apply)
   }
 
   /* implicit conversions */
@@ -63,6 +80,16 @@ object Common {
 
   implicit def toAnswer(quiz: Quiz): Answer = Answer(answer = quiz.correctAnswer)
 
-  implicit def toProfile(profile: Profile): Profile = Profile(id = profile
-    .id, username = profile.username, about = profile.about)
+  implicit def toUser(user: User): User = User(
+    id = user.id,
+    username = user.username,
+    about = user.about,
+    postList = user.postList,
+    friendList = user.friendList)
+
+  implicit def toProfile(user: User): Profile = Profile(username =
+    user.username, about = user.about, friendList = user.friendList)
+
+  implicit def toTimeline(user: User): TimeLine = TimeLine(username =
+    user.username, postList = user.postList)
 }

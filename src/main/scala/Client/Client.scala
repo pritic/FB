@@ -1,6 +1,8 @@
 package Client
 
-import Common.Common.Profile
+import java.util
+
+import Common.Common._
 import akka.actor.{Actor, ActorSystem, Props}
 import akka.io.IO
 import akka.pattern.ask
@@ -12,6 +14,7 @@ import spray.http._
 import spray.httpx.unmarshalling.FormDataUnmarshallers
 import spray.json._
 
+import scala.collection.immutable._
 import scala.concurrent.Await
 import scala.concurrent.duration._
 
@@ -44,40 +47,63 @@ object Client {
 
     val serverIP = args(0)
     val serverPort = args(1)
+    val userIDList: util.HashSet[String] = new util.HashSet[String]()
 
     implicit var system = ActorSystem("FBClient", ConfigFactory.load
-    (configfactory));
-    val client = system.actorOf(Props(new ClientActor("1", serverIP,
-      serverPort, system)),
-      "Client")
+    (configfactory))
 
-    client ! CreateProfile
+    for (i <- 1 until 5) {
+      userIDList.add("user" + i)
+
+      val client = system.actorOf(Props(new FBUser("user" + i, "name" + i,
+        "about" + i, serverIP, serverPort, system)), i.toString)
+
+      client ! CreateUser
+      client ! GetProfile("user" + i)
+      client ! GetTimeline("user" + i)
+    }
   }
 
-  class ClientActor(
-                     id: String, serverIP: String, serverPort: String,
-                     system: ActorSystem)
-    extends
-    Actor with FormDataUnmarshallers {
+  class FBUser(
+                userID: String,
+                name: String,
+                aboutMe: String,
+                serverIP: String,
+                serverPort: String,
+                system: ActorSystem
+              ) extends Actor with FormDataUnmarshallers {
+
+    val id: String = userID
+    var username: String = name
+    var about: String = aboutMe
+    var postList: Set[String] = new scala.collection.immutable.HashSet[String]
+    var friendList: Set[String] = new scala.collection.immutable
+    .HashSet[String]
+
+    //    postList.add("i am a post")
+    //    friendList.add("i am a friend")
+
+    postList += "i am a post"
+    friendList += "i am a friend"
 
     def receive: Receive = {
 
-      case CreateProfile =>
+      case CreateUser =>
 
         implicit val timeout = Timeout(10 seconds)
 
-        val jsonTweet = new Profile("id20", "username20", "aboutme20").toJson
+        val userJSON = new User(id, username, about, postList, friendList).toJson
 
-        println(jsonTweet)
+        //        println(userJSON)
 
         val future = IO(Http)(system).ask(HttpRequest(POST, Uri(s"http://" +
-          serverIP + ":" + (serverPort) + "/profile")).withEntity(HttpEntity(ContentType(MediaTypes.`application/json`), jsonTweet.toString()))).mapTo[HttpResponse]
+          serverIP + ":" + serverPort + "/user")).withEntity(HttpEntity(ContentType(MediaTypes.`application/json`), userJSON.toString()))).mapTo[HttpResponse]
 
         val response = Await.result(future, timeout.duration)
 
 
-        println("response: " + response)
-        self ! GetProfile("id2")
+        println("responseCreateProfile: " + response)
+      //        self ! GetProfile(id)
 
       case GetProfile(id: String) =>
 
@@ -88,12 +114,25 @@ object Client {
         val response = Await.result(future, timeout.duration)
 
 
-        println("response: " + response)
+        println("responseProfile: " + response)
+
+      case GetTimeline(id: String) =>
+
+        implicit val timeout = Timeout(10 seconds)
+        val future = IO(Http)(system).ask(HttpRequest(GET, Uri(s"http://" +
+          serverIP + ":" + (serverPort) + "/timeline/" + id)))
+
+        val response = Await.result(future, timeout.duration)
+
+
+        println("responseTimeline: " + response)
     }
   }
 
 }
 
-case class CreateProfile()
+case class CreateUser()
 
 case class GetProfile(id: String)
+
+case class GetTimeline(id: String)
