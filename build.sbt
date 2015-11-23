@@ -24,7 +24,3 @@ libraryDependencies ++= {
   )
 }
 
-//// Assembly settings
-//mainClass in Global := Some("com.danielasfregola.quiz.management.Main")
-//
-//jarName in assembly := "quiz-management-server.jar"
