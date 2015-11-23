@@ -39,13 +39,13 @@ object Server {
     spray {
       can {
         server {
-          server-header = "Quiz Management Service REST API"
+          server-header = "Facebook API"
         }
       }
     }
 
     http {
-      host = "0.0.0.0"
+      host = "127.0.0.1"
       host = ${?HOST}
       port = 5000
       port = ${?PORT}
@@ -61,7 +61,7 @@ object Server {
 
     val master = system.actorOf(Props(new RestInterface()), "httpInterface")
 
-    //    implicit val system = ActorSystem("Facebook-api")
+//        implicit val system = ActorSystem("Facebook-api")
 
     //    val api = system.actorOf(Props(new RestInterface()), "httpInterface")
 
@@ -191,6 +191,7 @@ trait RestApi extends HttpService with ActorLogging {
   }
 
   private def createProfile(profile: Profile): Boolean = {
+
     val doesNotExist = !profiles.exists(_.id == profile.id)
     if (doesNotExist) {
       profiles = profiles :+ profile
@@ -272,6 +273,10 @@ class Responder(requestContext: RequestContext) extends Actor with ActorLogging 
 
     case question: Question =>
       requestContext.complete(StatusCodes.OK, question)
+      killYourself
+
+    case profile: Profile =>
+      requestContext.complete(StatusCodes.OK, profile)
       killYourself
 
     case QuestionNotFound =>
