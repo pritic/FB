@@ -1,26 +1,29 @@
 package Common
 
+
 import spray.json._
-import spray.httpx.SprayJsonSupport._
 import spray.json.DefaultJsonProtocol._
+import spray.httpx.SprayJsonSupport._
 
 /**
   * Created by Priti Changlani on 11/22/15 at 4:52 PM.
   */
+
+
+
 object Common {
 
   case class User(
                    id: String,
                    username: String,
                    about: String,
-                   postList: scala.collection.immutable.HashMap[String, Post],
+                   postList: scala.collection.immutable.Map[String, Post],
                    friendList: scala.collection.immutable.Set[String]
                  )
 
   case class Profile(username: String, about: String, friendList: scala.collection.immutable.Set[String])
 
-  case class TimeLine(username: String, postList: scala.collection.immutable
-  .HashMap[String, Post])
+  case class TimeLine(username: String, postList: scala.collection.immutable.Map[String, Post])
 
   case class Post(
                    postID: String, from: String, to: String, privacy: String,
@@ -69,12 +72,17 @@ object Common {
   //    implicit val format = jsonFormat1(Answer.apply)
   //  }
 
+  object Post extends DefaultJsonProtocol {
+
+    implicit val format = jsonFormat5(Post.apply)
+  }
 
 
   object User extends DefaultJsonProtocol {
 
     implicit val format = jsonFormat5(User.apply)
   }
+
 
   object Profile extends DefaultJsonProtocol {
 
@@ -86,10 +94,7 @@ object Common {
     implicit val format = jsonFormat2(TimeLine.apply)
   }
 
-  object Post extends DefaultJsonProtocol {
 
-    implicit val format = jsonFormat5(Post.apply)
-  }
 
   /* implicit conversions */
 

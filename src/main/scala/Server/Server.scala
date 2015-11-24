@@ -13,6 +13,7 @@ import spray.routing._
 import scala.collection.immutable.Map
 import scala.concurrent.duration._
 import scala.language.postfixOps
+import spray.httpx.SprayJsonSupport._
 
 /**
   * Created by Priti Changlani on 11/22/15 at 4:45 PM.
@@ -95,8 +96,7 @@ trait RestApi extends HttpService with ActorLogging {
 //  var quizzes = Vector[Quiz]()
 
   var users = Vector[User]()
-  var posts: Map[String, Post] = new scala.collection.immutable
-  .HashMap[String, Post]
+  var posts: scala.collection.immutable.Map[String, Post] = new scala.collection.immutable.HashMap[String, Post]
 
   print(users)
 
