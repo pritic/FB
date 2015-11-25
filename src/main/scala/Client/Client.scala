@@ -64,6 +64,16 @@ object Client {
       client ! PostMessageToFriend("user" + i,"public","MessageContent")
     }
 
+
+    system.actorSelection("/user/1") ! PostMessageToFriend("user2",
+      "friends", "Hi I am a message post")
+    system.actorSelection("/user/1") ! PostMessageToFriend("user3",
+      "friends", "Hi I am a message post")
+    system.actorSelection("/user/1") ! PostMessageToFriend("user4",
+      "friends", "Hi I am a message post")
+
+    system.actorSelection("/user/1") ! GetMyPosts
+
   }
 
 
@@ -137,7 +147,7 @@ object Client {
       privacy: String) =>
         val post = new Post("pp1", id, friendID, privacy, content)
 
-        postList + ("pp1" -> post)
+        postList = postList + ("pp1" -> post)
 
         val postJSON = new Post("pp1", id, friendID, privacy, content)
           .toJson
@@ -152,7 +162,11 @@ object Client {
 
 
         println("responsePost: " + response)
-        println(postList("pp1"))
+
+//        println(postList.get("pp1"))
+
+      case GetMyPosts =>
+        println(postList)
 
     }
   }
@@ -168,3 +182,5 @@ case class GetTimeline(id: String)
 case class PostMessageToFriend(
                                 friendID: String, content: String,
                                 privacy: String)
+
+case class GetMyPosts()
