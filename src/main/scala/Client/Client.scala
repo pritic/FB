@@ -64,23 +64,10 @@ object Client {
       client ! PostMessageToFriend("user" + i,"public","MessageContent")
     }
 
-
   }
 
-  /*implicit object AnyJsonFormat extends JsonFormat[Any] {
-    def write(x: Any) = x match {
-      case n: Int => JsNumber(n)
-      case s: String => JsString(s)
-      case b: Boolean if b => JsTrue
-      case b: Boolean if !b => JsFalse
-    }
-    def read(value: JsValue) = value match {
-      case JsNumber(n) => n.intValue()
-      case JsString(s) => s
-      case JsTrue => true
-      case JsFalse => false
-    }
-  }*/
+
+
 
   class FBUser(
                 userID: String,
@@ -94,8 +81,8 @@ object Client {
     val id: String = userID
     var username: String = name
     var about: String = aboutMe
-    var postList: scala.collection.immutable
-    .Map[String, Post] = new scala.collection.immutable
+
+    var postList: Map[String, Post] = new scala.collection.immutable
     .HashMap[String, Post]
     var friendList: Set[String] = new scala.collection.immutable
     .HashSet[String]
@@ -163,7 +150,10 @@ object Client {
         val response = Await.result(future, timeout.duration)
 
 
-        println("responsePOST: " + response)
+
+        println("responsePost: " + response)
+        println(postList("pp1"))
+
     }
   }
 

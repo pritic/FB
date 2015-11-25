@@ -93,10 +93,13 @@ trait RestApi extends HttpService with ActorLogging {
 
   implicit val timeout = Timeout(50 seconds)
 
-//  var quizzes = Vector[Quiz]()
+  //  var quizzes = Vector[Quiz]()
 
   var users = Vector[User]()
-  var posts: scala.collection.immutable.Map[String, Post] = new scala.collection.immutable.HashMap[String, Post]
+
+  var posts: Map[String, Post] = new scala.collection.immutable
+  .HashMap[String, Post]
+
 
   print(users)
 
@@ -140,14 +143,16 @@ trait RestApi extends HttpService with ActorLogging {
           }
         }
       } ~
-      pathEnd {
-        post {
-          entity(as[Post]) { post => requestContext =>
-            val responder = createResponder(requestContext)
-            createPost(post)
-            responder ! PostCreated
-//              case _ => responder ! ProfileAlreadyExists
+      pathPrefix("post") {
+        pathEnd {
+          post {
+            entity(as[Post]) { post => requestContext =>
+              val responder = createResponder(requestContext)
+              createPost(post)
+              responder ! PostCreated
+              //              case _ => responder ! ProfileAlreadyExists
 
+            }
           }
         }
       }
@@ -157,15 +162,15 @@ trait RestApi extends HttpService with ActorLogging {
     context.actorOf(Props(new Responder(requestContext)))
   }
 
-//  private def createQuiz(quiz: Quiz): Boolean = {
-//
-//    val doesNotExist = !quizzes.exists(_.id == quiz.id)
-//    if (doesNotExist) {
-//      quizzes = quizzes :+ quiz
-//      print(quizzes)
-//    }
-//    doesNotExist
-//  }
+  //  private def createQuiz(quiz: Quiz): Boolean = {
+  //
+  //    val doesNotExist = !quizzes.exists(_.id == quiz.id)
+  //    if (doesNotExist) {
+  //      quizzes = quizzes :+ quiz
+  //      print(quizzes)
+  //    }
+  //    doesNotExist
+  //  }
 
   private def createProfile(user: User): Boolean = {
 
@@ -178,24 +183,25 @@ trait RestApi extends HttpService with ActorLogging {
   }
 
   private def createPost(post: Post): Unit = {
-    posts+(post.postID -> post)
+
+    posts + (post.postID -> post)
   }
 
-//  private def deleteQuiz(id: String): Unit = {
-//
-//    quizzes = quizzes.filterNot(_.id == id)
-//  }
-//
-//  private def getRandomQuestion: Option[Question] = {
-//
-//    !quizzes.isEmpty match {
-//      case true =>
-//        import scala.util.Random
-//        val idx = (new Random).nextInt(quizzes.size)
-//        Some(quizzes(idx))
-//      case _ => None
-//    }
-//  }
+  //  private def deleteQuiz(id: String): Unit = {
+  //
+  //    quizzes = quizzes.filterNot(_.id == id)
+  //  }
+  //
+  //  private def getRandomQuestion: Option[Question] = {
+  //
+  //    !quizzes.isEmpty match {
+  //      case true =>
+  //        import scala.util.Random
+  //        val idx = (new Random).nextInt(quizzes.size)
+  //        Some(quizzes(idx))
+  //      case _ => None
+  //    }
+  //  }
 
   private def getUser(id: String): Option[User] = {
 
@@ -217,20 +223,20 @@ trait RestApi extends HttpService with ActorLogging {
     users.find(_.id == id)
   }
 
-//  private def getQuestion(id: String): Option[Question] = {
-//
-//    getQuiz(id).map(toQuestion)
-//  }
-//
-//  private def getQuiz(id: String): Option[Quiz] = {
-//
-//    quizzes.find(_.id == id)
-//  }
-//
-//  private def isAnswerCorrect(id: String, proposedAnswer: Answer): Boolean = {
-//
-//    getQuiz(id).exists(_.correctAnswer == proposedAnswer.answer)
-//  }
+  //  private def getQuestion(id: String): Option[Question] = {
+  //
+  //    getQuiz(id).map(toQuestion)
+  //  }
+  //
+  //  private def getQuiz(id: String): Option[Quiz] = {
+  //
+  //    quizzes.find(_.id == id)
+  //  }
+  //
+  //  private def isAnswerCorrect(id: String, proposedAnswer: Answer): Boolean = {
+  //
+  //    getQuiz(id).exists(_.correctAnswer == proposedAnswer.answer)
+  //  }
 }
 
 class Responder(requestContext: RequestContext) extends Actor with ActorLogging {
@@ -239,9 +245,9 @@ class Responder(requestContext: RequestContext) extends Actor with ActorLogging 
 
   def receive = {
 
-//    case QuizCreated =>
-//      requestContext.complete(StatusCodes.Created)
-//      killYourself
+    //    case QuizCreated =>
+    //      requestContext.complete(StatusCodes.Created)
+    //      killYourself
 
     case ProfileCreated =>
       requestContext.complete(StatusCodes.Created)
@@ -251,21 +257,21 @@ class Responder(requestContext: RequestContext) extends Actor with ActorLogging 
       requestContext.complete(StatusCodes.Created)
       killYourself
 
-//    case QuizDeleted =>
-//      requestContext.complete(StatusCodes.OK)
-//      killYourself
+    //    case QuizDeleted =>
+    //      requestContext.complete(StatusCodes.OK)
+    //      killYourself
 
-//    case QuizAlreadyExists =>
-//      requestContext.complete(StatusCodes.Conflict)
-//      killYourself
+    //    case QuizAlreadyExists =>
+    //      requestContext.complete(StatusCodes.Conflict)
+    //      killYourself
 
     case ProfileAlreadyExists =>
       requestContext.complete(StatusCodes.Conflict)
       killYourself
 
-//    case question: Question =>
-//      requestContext.complete(StatusCodes.OK, question)
-//      killYourself
+    //    case question: Question =>
+    //      requestContext.complete(StatusCodes.OK, question)
+    //      killYourself
 
     case user: User =>
       requestContext.complete(StatusCodes.OK, user)
@@ -279,21 +285,21 @@ class Responder(requestContext: RequestContext) extends Actor with ActorLogging 
       requestContext.complete(StatusCodes.OK, timeline)
       killYourself
 
-//    case QuestionNotFound =>
-//      requestContext.complete(StatusCodes.NotFound)
-//      killYourself
+    //    case QuestionNotFound =>
+    //      requestContext.complete(StatusCodes.NotFound)
+    //      killYourself
 
     case ProfileNotFound =>
       requestContext.complete(StatusCodes.NotFound)
       killYourself
 
-//    case CorrectAnswer =>
-//      requestContext.complete(StatusCodes.OK)
-//      killYourself
-//
-//    case WrongAnswer =>
-//      requestContext.complete(StatusCodes.NotFound)
-//      killYourself
+    //    case CorrectAnswer =>
+    //      requestContext.complete(StatusCodes.OK)
+    //      killYourself
+    //
+    //    case WrongAnswer =>
+    //      requestContext.complete(StatusCodes.NotFound)
+    //      killYourself
   }
 
   private def killYourself = self ! PoisonPill

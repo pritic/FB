@@ -13,6 +13,8 @@ import spray.httpx.SprayJsonSupport._
 
 object Common {
 
+
+
   case class User(
                    id: String,
                    username: String,
@@ -23,7 +25,9 @@ object Common {
 
   case class Profile(username: String, about: String, friendList: scala.collection.immutable.Set[String])
 
-  case class TimeLine(username: String, postList: scala.collection.immutable.Map[String, Post])
+  case class TimeLine(username: String, postList: scala.collection.immutable
+  .Map[String, Post])
+
 
   case class Post(
                    postID: String, from: String, to: String, privacy: String,
@@ -77,7 +81,6 @@ object Common {
     implicit val format = jsonFormat5(Post.apply)
   }
 
-
   object User extends DefaultJsonProtocol {
 
     implicit val format = jsonFormat5(User.apply)
@@ -93,8 +96,6 @@ object Common {
 
     implicit val format = jsonFormat2(TimeLine.apply)
   }
-
-
 
   /* implicit conversions */
 
