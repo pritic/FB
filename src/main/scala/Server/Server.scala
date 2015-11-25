@@ -1,5 +1,7 @@
 package Server
 
+import java.util
+
 import akka.actor._
 import akka.io.IO
 import akka.util.Timeout
@@ -11,6 +13,7 @@ import spray.httpx.SprayJsonSupport._
 import spray.routing._
 
 import scala.collection.immutable.Map
+import scala.collection.mutable.ListBuffer
 import scala.concurrent.duration._
 import scala.language.postfixOps
 import spray.httpx.SprayJsonSupport._
@@ -101,7 +104,9 @@ trait RestApi extends HttpService with ActorLogging {
   .HashMap[String, Post]
 
 
-  print(users)
+  var allUserPostsMap: Map[String, List[Post]] = new scala.collection.immutable.HashMap[String, List[Post]]
+
+  var allUserFriendMap: Map[String, List[String]] = new scala.collection.immutable.HashMap[String, List[String]]
 
   def routes: Route =
 
@@ -150,27 +155,23 @@ trait RestApi extends HttpService with ActorLogging {
               val responder = createResponder(requestContext)
               createPost(post)
               responder ! PostCreated
-              //              case _ => responder ! ProfileAlreadyExists
-
             }
           }
-        }
+        } ~
+          path(Segment) { id =>
+            get {
+              requestContext =>
+              val responder = createResponder(requestContext)
+              getPosts(id).map(responder ! _)
+                .getOrElse(responder ! ProfileNotFound)
+            }
+          }
       }
 
   private def createResponder(requestContext: RequestContext) = {
 
     context.actorOf(Props(new Responder(requestContext)))
   }
-
-  //  private def createQuiz(quiz: Quiz): Boolean = {
-  //
-  //    val doesNotExist = !quizzes.exists(_.id == quiz.id)
-  //    if (doesNotExist) {
-  //      quizzes = quizzes :+ quiz
-  //      print(quizzes)
-  //    }
-  //    doesNotExist
-  //  }
 
   private def createProfile(user: User): Boolean = {
 
@@ -184,24 +185,31 @@ trait RestApi extends HttpService with ActorLogging {
 
   private def createPost(post: Post): Unit = {
 
-    posts + (post.postID -> post)
+    allUserPostsMap.get(post.from) match {
+      case Some(x) =>
+        val y = post :: x
+        allUserPostsMap = allUserPostsMap + (post.from -> y)
+      case None =>
+        val y = List(post)
+        allUserPostsMap = allUserPostsMap + (post.from -> y)
+    }
+
+    allUserPostsMap.get(post.to) match {
+      case Some(x) =>
+        val y = post :: x
+        allUserPostsMap = allUserPostsMap + (post.to -> y)
+      case None =>
+        val y = List(post)
+        allUserPostsMap = allUserPostsMap + (post.to -> y)
+    }
+
+    //    posts + (post.postID -> post)
   }
 
-  //  private def deleteQuiz(id: String): Unit = {
-  //
-  //    quizzes = quizzes.filterNot(_.id == id)
-  //  }
-  //
-  //  private def getRandomQuestion: Option[Question] = {
-  //
-  //    !quizzes.isEmpty match {
-  //      case true =>
-  //        import scala.util.Random
-  //        val idx = (new Random).nextInt(quizzes.size)
-  //        Some(quizzes(idx))
-  //      case _ => None
-  //    }
-  //  }
+  private def getPosts(id:String): Option[List[Post]] = {
+    println("i am in server:getPosts; id: "+id)
+    allUserPostsMap.get(id).map(toPosts)
+  }
 
   private def getUser(id: String): Option[User] = {
 
@@ -257,21 +265,9 @@ class Responder(requestContext: RequestContext) extends Actor with ActorLogging 
       requestContext.complete(StatusCodes.Created)
       killYourself
 
-    //    case QuizDeleted =>
-    //      requestContext.complete(StatusCodes.OK)
-    //      killYourself
-
-    //    case QuizAlreadyExists =>
-    //      requestContext.complete(StatusCodes.Conflict)
-    //      killYourself
-
     case ProfileAlreadyExists =>
       requestContext.complete(StatusCodes.Conflict)
       killYourself
-
-    //    case question: Question =>
-    //      requestContext.complete(StatusCodes.OK, question)
-    //      killYourself
 
     case user: User =>
       requestContext.complete(StatusCodes.OK, user)
@@ -285,9 +281,9 @@ class Responder(requestContext: RequestContext) extends Actor with ActorLogging 
       requestContext.complete(StatusCodes.OK, timeline)
       killYourself
 
-    //    case QuestionNotFound =>
-    //      requestContext.complete(StatusCodes.NotFound)
-    //      killYourself
+    case posts: List[Post] =>
+      requestContext.complete(StatusCodes.OK, posts)
+      killYourself
 
     case ProfileNotFound =>
       requestContext.complete(StatusCodes.NotFound)

@@ -73,6 +73,8 @@ object Client {
       "friends", "Hi I am a message post")
 
     system.actorSelection("/user/1") ! GetMyPosts
+    Thread.sleep(100)
+    system.actorSelection("/user/2") ! GetMyPosts
 
   }
 
@@ -145,11 +147,12 @@ object Client {
 
       case PostMessageToFriend(friendID: String, content: String,
       privacy: String) =>
-        val post = new Post("pp1", id, friendID, privacy, content)
+        //        val post = new Post(System.currentTimeMillis().toString, id, friendID,
+        //          privacy, content)
 
-        postList = postList + ("pp1" -> post)
+        //        postList = postList + ("pp1" -> post)
 
-        val postJSON = new Post("pp1", id, friendID, privacy, content)
+        val postJSON = new Post(System.currentTimeMillis().toString, id, friendID, privacy, content)
           .toJson
 
         implicit val timeout = Timeout(10 seconds)
@@ -160,13 +163,20 @@ object Client {
         val response = Await.result(future, timeout.duration)
 
 
-
-        println("responsePost: " + response)
-
-//        println(postList.get("pp1"))
+        println("response: PostMessageToFriend: " + response)
+      //        println(postList.get("pp1"))
 
       case GetMyPosts =>
-        println(postList)
+        //        println(postList)
+
+        implicit val timeout = Timeout(10 seconds)
+        println("i am in getmypost, id: " + id)
+        val future = IO(Http)(system).ask(HttpRequest(GET, Uri(s"http://" +
+          serverIP + ":" + serverPort + "/post/" + id)))
+
+        val response = Await.result(future, timeout.duration)
+
+        println("response: GetMyPosts: " + response)
 
     }
   }
