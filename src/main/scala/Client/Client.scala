@@ -73,8 +73,17 @@ object Client {
       "friends", "Hi I am a message post")
 
     system.actorSelection("/user/1") ! GetMyPosts
-    Thread.sleep(100)
+    Thread.sleep(1000)
     system.actorSelection("/user/2") ! GetMyPosts
+
+    Thread.sleep(1000)
+    system.actorSelection("/user/1") ! MakeFriend("user2")
+    Thread.sleep(1000)
+    system.actorSelection("/user/1") ! GetFriendList("user1")
+    Thread.sleep(1000)
+    system.actorSelection("/user/2") ! GetFriendList("user1")
+    Thread.sleep(1000)
+    system.actorSelection("/user/2") ! GetFriendList("user2")
 
   }
 
@@ -99,8 +108,6 @@ object Client {
     var friendList: Set[String] = new scala.collection.immutable
     .HashSet[String]
 
-    //    postList.add("i am a post")
-    //    friendList.add("i am a friend")
 
     friendList += "i am a friend"
 
@@ -111,8 +118,6 @@ object Client {
         implicit val timeout = Timeout(10 seconds)
 
         val userJSON = new User(id, username, about, postList, friendList).toJson
-
-        //        println(userJSON)
 
         val future = IO(Http)(system).ask(HttpRequest(POST, Uri(s"http://" +
           serverIP + ":" + serverPort + "/user")).withEntity(HttpEntity(ContentType(MediaTypes.`application/json`), userJSON.toString()))).mapTo[HttpResponse]
@@ -147,10 +152,7 @@ object Client {
 
       case PostMessageToFriend(friendID: String, content: String,
       privacy: String) =>
-        //        val post = new Post(System.currentTimeMillis().toString, id, friendID,
-        //          privacy, content)
 
-        //        postList = postList + ("pp1" -> post)
 
         val postJSON = new Post(System.currentTimeMillis().toString, id, friendID, privacy, content)
           .toJson
@@ -164,19 +166,44 @@ object Client {
 
 
         println("response: PostMessageToFriend: " + response)
-      //        println(postList.get("pp1"))
 
       case GetMyPosts =>
-        //        println(postList)
 
         implicit val timeout = Timeout(10 seconds)
-        println("i am in getmypost, id: " + id)
+//        println("i am in getmypost, id: " + id)
         val future = IO(Http)(system).ask(HttpRequest(GET, Uri(s"http://" +
           serverIP + ":" + serverPort + "/post/" + id)))
 
         val response = Await.result(future, timeout.duration)
 
         println("response: GetMyPosts: " + response)
+
+
+      case MakeFriend(id1: String)=>
+
+        implicit val timeout = Timeout(10 seconds)
+
+        val friendRequestJSON = new FriendRequest(id, id1).toJson
+
+        val future = IO(Http)(system).ask(HttpRequest(POST, Uri(s"http://" +
+          serverIP + ":" + serverPort + "/makefriend")).withEntity
+        (HttpEntity(ContentType(MediaTypes.`application/json`), friendRequestJSON.toString()))).mapTo[HttpResponse]
+
+        val response = Await.result(future, timeout.duration)
+
+
+        println("response: MakeFriend: "+id+" is making friends" + response)
+
+
+      case GetFriendList(id1: String) =>
+        implicit val timeout = Timeout(10 seconds)
+        val future = IO(Http)(system).ask(HttpRequest(GET, Uri(s"http://" +
+          serverIP + ":" + serverPort + "/getfriends/" + id1)))
+
+        val response = Await.result(future, timeout.duration)
+
+        println("response: GetFriendList: "+id+" is getting friends" +
+          response)
 
     }
   }
@@ -194,3 +221,5 @@ case class PostMessageToFriend(
                                 privacy: String)
 
 case class GetMyPosts()
+case class MakeFriend(id: String)
+case class GetFriendList(id: String)

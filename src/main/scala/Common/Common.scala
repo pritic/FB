@@ -12,8 +12,6 @@ import spray.json._
 
 object Common {
 
-
-
   case class User(
                    id: String,
                    username: String,
@@ -24,13 +22,19 @@ object Common {
 
   case class Profile(username: String, about: String, friendList: scala.collection.immutable.Set[String])
 
-  case class TimeLine(username: String, postList: scala.collection.immutable
+  case class TimeLine(
+                       username: String, postList: scala.collection.immutable
   .Map[String, Post])
+
+
+  case class FriendRequest(from: String, to: String)
 
 
   case class Post(
                    date: String, from: String, to: String, privacy: String,
                    content: String)
+
+
 
   case object ProfileNotFound
 
@@ -40,7 +44,14 @@ object Common {
 
   case object ProfileAlreadyExists
 
+  case object FriendsMade
+
   /* json (un)marshalling */
+
+  object FriendRequest extends DefaultJsonProtocol {
+
+    implicit val format = jsonFormat2(FriendRequest.apply)
+  }
 
   object Post extends DefaultJsonProtocol {
 
@@ -63,6 +74,8 @@ object Common {
     implicit val format = jsonFormat2(TimeLine.apply)
   }
 
+
+
   /* implicit conversions */
 
   implicit def toUser(user: User): User = User(
@@ -81,5 +94,7 @@ object Common {
   implicit def toPost(post: Post): Post = Post(date = post.date, from =
     post.from, to = post.to, privacy = post.privacy, content = post.content)
 
-  implicit def toPosts(post_List: List[Post]):List[Post] = post_List
+  implicit def toPosts(post_List: List[Post]): List[Post] = post_List
+
+  implicit def toFriends(friend_List: List[String]): List[String] = friend_List
 }

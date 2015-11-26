@@ -161,11 +161,31 @@ trait RestApi extends HttpService with ActorLogging {
           path(Segment) { id =>
             get {
               requestContext =>
-              val responder = createResponder(requestContext)
-              getPosts(id).map(responder ! _)
-                .getOrElse(responder ! ProfileNotFound)
+                val responder = createResponder(requestContext)
+                getPosts(id).map(responder ! _)
+                  .getOrElse(responder ! ProfileNotFound)
             }
           }
+      } ~
+      pathPrefix("makefriend") {
+        pathEnd {
+          post {
+            entity(as[FriendRequest]) { friendRequest => requestContext =>
+              val responder = createResponder(requestContext)
+              makeFriend(friendRequest)
+              responder ! FriendsMade
+            }
+          }
+        }
+      } ~
+      pathPrefix("getfriends") {
+        path(Segment) { id =>
+          get { requestContext =>
+            val responder = createResponder(requestContext)
+            getFriends(id).map(responder ! _.toString())
+              .getOrElse(responder ! ProfileNotFound)
+          }
+        }
       }
 
   private def createResponder(requestContext: RequestContext) = {
@@ -202,12 +222,11 @@ trait RestApi extends HttpService with ActorLogging {
         val y = List(post)
         allUserPostsMap = allUserPostsMap + (post.to -> y)
     }
-
-    //    posts + (post.postID -> post)
   }
 
-  private def getPosts(id:String): Option[List[Post]] = {
-    println("i am in server:getPosts; id: "+id)
+  private def getPosts(id: String): Option[List[Post]] = {
+
+    println("i am in server:getPosts; id: " + id)
     allUserPostsMap.get(id).map(toPosts)
   }
 
@@ -231,20 +250,31 @@ trait RestApi extends HttpService with ActorLogging {
     users.find(_.id == id)
   }
 
-  //  private def getQuestion(id: String): Option[Question] = {
-  //
-  //    getQuiz(id).map(toQuestion)
-  //  }
-  //
-  //  private def getQuiz(id: String): Option[Quiz] = {
-  //
-  //    quizzes.find(_.id == id)
-  //  }
-  //
-  //  private def isAnswerCorrect(id: String, proposedAnswer: Answer): Boolean = {
-  //
-  //    getQuiz(id).exists(_.correctAnswer == proposedAnswer.answer)
-  //  }
+  private def makeFriend(friendRequest: FriendRequest): Unit = {
+
+    allUserFriendMap.get(friendRequest.from) match {
+      case Some(x) =>
+        val y = friendRequest.to :: x
+        allUserFriendMap = allUserFriendMap + (friendRequest.from -> y)
+      case None =>
+        val y = List(friendRequest.to)
+        allUserFriendMap = allUserFriendMap + (friendRequest.from -> y)
+    }
+
+    allUserFriendMap.get(friendRequest.to) match {
+      case Some(x) =>
+        val y = friendRequest.from :: x
+        allUserFriendMap = allUserFriendMap + (friendRequest.to -> y)
+      case None =>
+        val y = List(friendRequest.from)
+        allUserFriendMap = allUserFriendMap + (friendRequest.to -> y)
+    }
+  }
+
+  private def getFriends(id:String): Option[List[String]] = {
+    println("i am in server:getFriends; id: " + id)
+    allUserFriendMap.get(id).map(toFriends)
+  }
 }
 
 class Responder(requestContext: RequestContext) extends Actor with ActorLogging {
@@ -252,10 +282,6 @@ class Responder(requestContext: RequestContext) extends Actor with ActorLogging 
   import Common.Common._
 
   def receive = {
-
-    //    case QuizCreated =>
-    //      requestContext.complete(StatusCodes.Created)
-    //      killYourself
 
     case ProfileCreated =>
       requestContext.complete(StatusCodes.Created)
@@ -285,17 +311,18 @@ class Responder(requestContext: RequestContext) extends Actor with ActorLogging 
       requestContext.complete(StatusCodes.OK, posts)
       killYourself
 
+    case friends:String =>
+      requestContext.complete(StatusCodes.OK, friends)
+      killYourself
+
     case ProfileNotFound =>
       requestContext.complete(StatusCodes.NotFound)
       killYourself
 
-    //    case CorrectAnswer =>
-    //      requestContext.complete(StatusCodes.OK)
-    //      killYourself
-    //
-    //    case WrongAnswer =>
-    //      requestContext.complete(StatusCodes.NotFound)
-    //      killYourself
+    case FriendsMade =>
+      requestContext.complete(StatusCodes.OK)
+      killYourself
+
   }
 
   private def killYourself = self ! PoisonPill
