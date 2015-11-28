@@ -59,13 +59,14 @@ object Client {
         "about" + i, serverIP, serverPort, system)), i.toString)
 
       client ! CreateUser
-
       //      client ! GetProfile("user" + i)
       //      client ! GetTimeline("user" + i)
     }
 
     system.actorSelection("/user/1") ! MakeFriend("user2")
     Thread.sleep(1000)
+
+    //    Thread.sleep(1000)
 
     system.actorSelection("/user/1") ! PostMessageToFriend("user2",
       "Hi I am a message post", "friends")
@@ -114,9 +115,6 @@ object Client {
 
   }
 
-
-
-
   class FBUser(
                 userID: String,
                 name: String,
@@ -129,7 +127,6 @@ object Client {
     val id: String = userID
     var username: String = name
     var about: String = aboutMe
-
     var postList: Map[String, Post] = new scala.collection.immutable
     .HashMap[String, Post]
     var friendList: Set[String] = new scala.collection.immutable
@@ -206,9 +203,7 @@ object Client {
 
         println("response: GetMyPosts: " + response)
 
-
       case MakeFriend(id1: String) =>
-
 
         implicit val timeout = Timeout(10 seconds)
 
@@ -232,7 +227,6 @@ object Client {
 
         println("response: GetFriendList: " + id + " is getting friends" +
           response)
-
 
       case PostPicture(albumID: String
       ,privacy: String) =>
@@ -277,7 +271,6 @@ object Client {
 
 
         println("response: GetAlbum: " + response)
-
 
     }
   }

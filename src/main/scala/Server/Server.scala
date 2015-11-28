@@ -16,7 +16,6 @@ import scala.collection.immutable.Map
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.duration._
 import scala.language.postfixOps
-import spray.httpx.SprayJsonSupport._
 
 /**
   * Created by Priti Changlani on 11/22/15 at 4:45 PM.
@@ -100,7 +99,6 @@ trait RestApi extends HttpService with ActorLogging {
 
   var posts: Map[String, Post] = new scala.collection.immutable
   .HashMap[String, Post]
-
 
   var allUserPostsMap: Map[String, List[Post]] = new scala.collection.immutable.HashMap[String, List[Post]]
 
@@ -413,7 +411,7 @@ trait RestApi extends HttpService with ActorLogging {
               (y.privacy.equalsIgnoreCase("public") ||
                 y.privacy.equalsIgnoreCase("friends"))
                 && y.albumID.equalsIgnoreCase(albumID)
-                )
+            )
               requestedAlbumList = requestedAlbumList :+ y
           )
         case None =>

@@ -1,15 +1,10 @@
 package Common
 
-
 import spray.json._
-
 
 /**
   * Created by Priti Changlani on 11/22/15 at 4:52 PM.
   */
-
-
-
 object Common {
 
   case class User(
@@ -26,14 +21,11 @@ object Common {
                        username: String, postList: scala.collection.immutable
   .Map[String, Post])
 
-
   case class FriendRequest(from: String, to: String)
-
 
   case class TimelineResponse(
                                requestor: String, responseList: scala
   .collection.immutable.List[Post])
-
 
   case class Post(
                    date: String, from: String, to: String, privacy: String,
@@ -90,7 +82,6 @@ object Common {
 
     implicit val format = jsonFormat5(User.apply)
   }
-
 
   object Profile extends DefaultJsonProtocol {
 
