@@ -30,23 +30,46 @@ object Common {
   case class FriendRequest(from: String, to: String)
 
 
+  case class TimelineResponse(
+                               requestor: String, responseList: scala
+  .collection.immutable.List[Post])
+
+
   case class Post(
                    date: String, from: String, to: String, privacy: String,
                    content: String)
 
+  case class Picture(date: String, from: String, albumID: String, privacy: String, pictureContent: String)
 
+  case class Album(requestor: String, responseList: scala.collection.immutable.List[Picture])
 
-  case object ProfileNotFound
+  case object NotFound
 
   case object ProfileCreated
 
   case object PostCreated
 
+  case object ImageCreated
+
   case object ProfileAlreadyExists
 
   case object FriendsMade
 
+  case object TimelineResponse1
+
+  case object AlbumResponse1
+
   /* json (un)marshalling */
+
+  object Picture extends DefaultJsonProtocol {
+
+    implicit val format = jsonFormat5(Picture.apply)
+  }
+
+  object Album extends DefaultJsonProtocol {
+
+    implicit val format = jsonFormat2(Album.apply)
+  }
 
   object FriendRequest extends DefaultJsonProtocol {
 
@@ -56,6 +79,11 @@ object Common {
   object Post extends DefaultJsonProtocol {
 
     implicit val format = jsonFormat5(Post.apply)
+  }
+
+  object TimelineResponse extends DefaultJsonProtocol {
+
+    implicit val format = jsonFormat2(TimelineResponse.apply)
   }
 
   object User extends DefaultJsonProtocol {
@@ -73,8 +101,6 @@ object Common {
 
     implicit val format = jsonFormat2(TimeLine.apply)
   }
-
-
 
   /* implicit conversions */
 
@@ -97,4 +123,6 @@ object Common {
   implicit def toPosts(post_List: List[Post]): List[Post] = post_List
 
   implicit def toFriends(friend_List: List[String]): List[String] = friend_List
+
+  implicit def toUsersName(user: User): String = user.username
 }

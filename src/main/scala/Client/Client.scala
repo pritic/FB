@@ -59,31 +59,58 @@ object Client {
         "about" + i, serverIP, serverPort, system)), i.toString)
 
       client ! CreateUser
-      client ! GetProfile("user" + i)
-      client ! GetTimeline("user" + i)
-      client ! PostMessageToFriend("user" + i,"public","MessageContent")
+
+      //      client ! GetProfile("user" + i)
+      //      client ! GetTimeline("user" + i)
     }
 
-
-    system.actorSelection("/user/1") ! PostMessageToFriend("user2",
-      "friends", "Hi I am a message post")
-    system.actorSelection("/user/1") ! PostMessageToFriend("user3",
-      "friends", "Hi I am a message post")
-    system.actorSelection("/user/1") ! PostMessageToFriend("user4",
-      "friends", "Hi I am a message post")
-
-    system.actorSelection("/user/1") ! GetMyPosts
-    Thread.sleep(1000)
-    system.actorSelection("/user/2") ! GetMyPosts
-
-    Thread.sleep(1000)
     system.actorSelection("/user/1") ! MakeFriend("user2")
     Thread.sleep(1000)
-    system.actorSelection("/user/1") ! GetFriendList("user1")
+
+    system.actorSelection("/user/1") ! PostMessageToFriend("user2",
+      "Hi I am a message post", "friends")
+
     Thread.sleep(1000)
-    system.actorSelection("/user/2") ! GetFriendList("user1")
+
+    system.actorSelection("/user/1") ! PostMessageToFriend("user3",
+      "Hi I am a message post", "friends")
+
     Thread.sleep(1000)
-    system.actorSelection("/user/2") ! GetFriendList("user2")
+
+    system.actorSelection("/user/1") ! PostMessageToFriend("user4",
+      "Hi I am a message post", "public")
+
+    Thread.sleep(1000)
+
+    system.actorSelection("/user/4") ! PostMessageToFriend("user2",
+      "Hi I am a private post dont dare read me", "private")
+
+    //    system.actorSelection("/user/1") ! GetMyPosts
+    //    Thread.sleep(1000)
+    //    system.actorSelection("/user/2") ! GetMyPosts
+    Thread.sleep(1000)
+
+
+
+    //    system.actorSelection("/user/1") ! GetFriendList("user1")
+    //    Thread.sleep(1000)
+    //    system.actorSelection("/user/2") ! GetFriendList("user1")
+    //    Thread.sleep(1000)
+    //    system.actorSelection("/user/2") ! GetFriendList("user2")
+
+    system.actorSelection("/user/1") ! GetTimeline("user2")
+
+    system.actorSelection("/user/1") ! PostPicture("album1","public")
+    system.actorSelection("/user/1") ! PostPicture("album2","public")
+    system.actorSelection("/user/1") ! PostPicture("album3","friends")
+    system.actorSelection("/user/1") ! PostPicture("album1","friends")
+    system.actorSelection("/user/1") ! PostPicture("album1","private")
+    system.actorSelection("/user/1") ! PostPicture("album5", "friends")
+    Thread.sleep(1000)
+    system.actorSelection("/user/1") ! GetAlbum("user2","album1")
+    Thread.sleep(1000)
+    system.actorSelection("/user/1") ! GetPictures("user2")
+
 
   }
 
@@ -108,8 +135,7 @@ object Client {
     var friendList: Set[String] = new scala.collection.immutable
     .HashSet[String]
 
-
-    friendList += "i am a friend"
+    //    friendList += "i am a friend"
 
     def receive: Receive = {
 
@@ -126,7 +152,6 @@ object Client {
 
 
         println("responseCreateProfile: " + response)
-      //        self ! GetProfile(id)
 
       case GetProfile(id: String) =>
 
@@ -139,16 +164,20 @@ object Client {
 
         println("responseProfile: " + response)
 
-      case GetTimeline(id: String) =>
+      case GetTimeline(id1: String) =>
 
         implicit val timeout = Timeout(10 seconds)
+
+        //        val timelineRequestJSON = new TimelineRequest(id, id1).toJson
+
         val future = IO(Http)(system).ask(HttpRequest(GET, Uri(s"http://" +
-          serverIP + ":" + (serverPort) + "/timeline/" + id)))
+          serverIP + ":" + serverPort + "/timeline?sender=" +
+          id + "&requested=" + id1)))
 
         val response = Await.result(future, timeout.duration)
 
 
-        println("responseTimeline: " + response)
+        println("response: GetTimeline: " + response)
 
       case PostMessageToFriend(friendID: String, content: String,
       privacy: String) =>
@@ -170,7 +199,6 @@ object Client {
       case GetMyPosts =>
 
         implicit val timeout = Timeout(10 seconds)
-//        println("i am in getmypost, id: " + id)
         val future = IO(Http)(system).ask(HttpRequest(GET, Uri(s"http://" +
           serverIP + ":" + serverPort + "/post/" + id)))
 
@@ -179,7 +207,8 @@ object Client {
         println("response: GetMyPosts: " + response)
 
 
-      case MakeFriend(id1: String)=>
+      case MakeFriend(id1: String) =>
+
 
         implicit val timeout = Timeout(10 seconds)
 
@@ -192,8 +221,7 @@ object Client {
         val response = Await.result(future, timeout.duration)
 
 
-        println("response: MakeFriend: "+id+" is making friends" + response)
-
+        println("response: MakeFriend: " + id + " is making friends" + response)
 
       case GetFriendList(id1: String) =>
         implicit val timeout = Timeout(10 seconds)
@@ -202,8 +230,54 @@ object Client {
 
         val response = Await.result(future, timeout.duration)
 
-        println("response: GetFriendList: "+id+" is getting friends" +
+        println("response: GetFriendList: " + id + " is getting friends" +
           response)
+
+
+      case PostPicture(albumID: String
+      ,privacy: String) =>
+
+        val pixelImagebase64String = "R0lGODlhAQABAIAAAP///wAAACwAAAAAAQABAAACAkQBADs="
+        val imageJSON = new Picture(System.currentTimeMillis().toString, id, albumID, privacy, pixelImagebase64String)
+          .toJson
+
+        implicit val timeout = Timeout(10 seconds)
+
+        val future = IO(Http)(system).ask(HttpRequest(POST, Uri(s"http://" +
+          serverIP + ":" + serverPort + "/picture")).withEntity(HttpEntity(ContentType(MediaTypes.`application/json`), imageJSON.toString()))).mapTo[HttpResponse]
+
+        val response = Await.result(future, timeout.duration)
+
+        println("response: PostPicture: " + response)
+
+      case GetPictures(id1: String) =>
+
+        implicit val timeout = Timeout(10 seconds)
+
+        //        val timelineRequestJSON = new TimelineRequest(id, id1).toJson
+
+        val future = IO(Http)(system).ask(HttpRequest(GET, Uri(s"http://" +
+          serverIP + ":" + serverPort + "/picture?sender=" +
+          id + "&requested=" + id1)))
+
+        val response = Await.result(future, timeout.duration)
+
+
+        println("response: GetPictures: " + response)
+
+      case GetAlbum(requestorID: String,albumID: String) =>
+
+        implicit val timeout = Timeout(10 seconds)
+
+        val future = IO(Http)(system).ask(HttpRequest(GET, Uri(s"http://" +
+          serverIP + ":" + serverPort + "/album?albumowner="+id+"&requestorid=" +
+          requestorID + "&requestedalbum=" + albumID)))
+
+        val response = Await.result(future, timeout.duration)
+
+
+        println("response: GetAlbum: " + response)
+
 
     }
   }
@@ -221,5 +295,13 @@ case class PostMessageToFriend(
                                 privacy: String)
 
 case class GetMyPosts()
+
 case class MakeFriend(id: String)
+
 case class GetFriendList(id: String)
+
+case class PostPicture(albumID: String,privacy: String)
+
+case class GetAlbum(requestorID: String,albumID: String)
+
+case class GetPictures(id1: String)
