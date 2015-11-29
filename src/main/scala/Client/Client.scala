@@ -148,11 +148,13 @@ object Client {
       case Schedule(id1: String) =>
 
         val m = Random.nextInt(userIDList.size())
+
 //        self ! GetProfile("user" + m)
 //        self ! GetFriendList("user" + m)
         self ! GetTimeline(id1)
         self ! PostMessage(id1, "This is a post from " + id + " to " +
           id1, privacyList.get(Random.nextInt(3)))
+
 
       case CreateUser =>
 
@@ -249,8 +251,13 @@ object Client {
       case PostPicture(albumID: String
       , privacy: String) =>
 
-        val pixelImagebase64String = "R0lGODlhAQABAIAAAP///wAAACwAAAAAAQABAAACAkQBADs="
-        val imageJSON = new Picture(System.currentTimeMillis().toString, id, albumID, privacy, pixelImagebase64String)
+        val is = this.getClass.getClassLoader().getResourceAsStream("picture.jpg");
+        val stream = Stream.continually(is.read).takeWhile(_ != -1).map(_.toByte)
+        val bytes = stream.toArray
+        val pictureBase64String = new sun.misc.BASE64Encoder().encode(bytes)
+
+        //val pixelImagebase64String = "R0lGODlhAQABAIAAAP///wAAACwAAAAAAQABAAACAkQBADs="
+        val imageJSON = new Picture(System.currentTimeMillis().toString, id, albumID, privacy, pictureBase64String)
           .toJson
 
         implicit val timeout = Timeout(10 seconds)
