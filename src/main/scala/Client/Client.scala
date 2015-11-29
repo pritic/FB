@@ -12,19 +12,24 @@ import spray.can.Http
 import spray.http.HttpMethods._
 import spray.http._
 import spray.httpx.unmarshalling.FormDataUnmarshallers
-import spray.json
 import spray.json._
-import scala.util.parsing.json._
-import scala.util.parsing.json.JSON
 
 import scala.collection.immutable._
 import scala.concurrent.Await
 import scala.concurrent.duration._
+import scala.util.Random
+import scala.concurrent.ExecutionContext.Implicits.global
 
 /**
   * Created by Priti Changlani on 11/22/15 at 4:41 PM.
   */
 object Client {
+
+  val userIDList: util.HashSet[String] = new util.HashSet[String]()
+  val privacyList: util.HashMap[Int, String] = new util.HashMap[Int, String]()
+  privacyList.put(1, "public")
+  privacyList.put(2, "private")
+  privacyList.put(3, "friends")
 
   def main(args: Array[String]): Unit = {
 
@@ -50,49 +55,49 @@ object Client {
 
     val serverIP = args(0)
     val serverPort = args(1)
-    val userIDList: util.HashSet[String] = new util.HashSet[String]()
+    val numOfUsers = args(2).toInt
 
     implicit var system = ActorSystem("FBClient", ConfigFactory.load
     (configfactory))
 
-    for (i <- 1 until 5) {
+    for (i <- 1 to numOfUsers) {
       userIDList.add("user" + i)
 
       val client = system.actorOf(Props(new FBUser("user" + i, "name" + i,
         "about" + i, serverIP, serverPort, system)), i.toString)
 
       client ! CreateUser
-      //      client ! GetProfile("user" + i)
-      //      client ! GetTimeline("user" + i)
+      system.scheduler.schedule(10000 millis, 10000 millis, client, Schedule
+      ("user" + Random.nextInt(userIDList.size())))
     }
 
-    system.actorSelection("/user/1") ! MakeFriend("user2")
-    Thread.sleep(1000)
-
-    //    Thread.sleep(1000)
-
-    system.actorSelection("/user/1") ! PostMessageToFriend("user2",
-      "Hi I am a message post", "friends")
-
-    Thread.sleep(1000)
-
-    system.actorSelection("/user/1") ! PostMessageToFriend("user3",
-      "Hi I am a message post", "friends")
-
-    Thread.sleep(1000)
-
-    system.actorSelection("/user/1") ! PostMessageToFriend("user4",
-      "Hi I am a message post", "public")
-
-    Thread.sleep(1000)
-
-    system.actorSelection("/user/4") ! PostMessageToFriend("user2",
-      "Hi I am a private post dont dare read me", "private")
-
-        system.actorSelection("/user/1") ! GetMyPosts
-        Thread.sleep(1000)
-        system.actorSelection("/user/2") ! GetMyPosts
-    Thread.sleep(1000)
+//    system.actorSelection("/user/1") ! MakeFriend("user2")
+//    Thread.sleep(1000)
+//
+//    //    Thread.sleep(1000)
+//
+//    system.actorSelection("/user/1") ! PostMessage("user2",
+//      "Hi I am a message post", "friends")
+//
+//    Thread.sleep(1000)
+//
+//    system.actorSelection("/user/1") ! PostMessage("user3",
+//      "Hi I am a message post", "friends")
+//
+//    Thread.sleep(1000)
+//
+//    system.actorSelection("/user/1") ! PostMessage("user4",
+//      "Hi I am a message post", "public")
+//
+//    Thread.sleep(1000)
+//
+//    system.actorSelection("/user/4") ! PostMessage("user2",
+//      "Hi I am a private post dont dare read me", "private")
+//
+//    system.actorSelection("/user/1") ! GetMyPosts
+//    Thread.sleep(1000)
+//    system.actorSelection("/user/2") ! GetMyPosts
+//    Thread.sleep(1000)
 
 
 
@@ -102,21 +107,20 @@ object Client {
     //    Thread.sleep(1000)
     //    system.actorSelection("/user/2") ! GetFriendList("user2")
 
-    system.actorSelection("/user/1") ! GetTimeline("user2")
-
-    system.actorSelection("/user/2") ! PostPicture("album1","public")
-    system.actorSelection("/user/1") ! PostPicture("album2","public")
-    system.actorSelection("/user/2") ! PostPicture("album3","friends")
-    system.actorSelection("/user/2") ! PostPicture("album1","friends")
-    system.actorSelection("/user/1") ! PostPicture("album1","public")
-    system.actorSelection("/user/1") ! PostPicture("album5", "friends")
-    Thread.sleep(1000)
-    system.actorSelection("/user/1") ! GetAlbum("user2","album1")
-    Thread.sleep(1000)
-    system.actorSelection("/user/1") ! GetPictures("user2")
-    Thread.sleep(1000)
-    system.actorSelection("/user/3") ! GetPictures("user2")
-
+//    system.actorSelection("/user/1") ! GetTimeline("user2")
+//
+//    system.actorSelection("/user/2") ! PostPicture("album1", "public")
+//    system.actorSelection("/user/1") ! PostPicture("album2", "public")
+//    system.actorSelection("/user/2") ! PostPicture("album3", "friends")
+//    system.actorSelection("/user/2") ! PostPicture("album1", "friends")
+//    system.actorSelection("/user/1") ! PostPicture("album1", "public")
+//    system.actorSelection("/user/1") ! PostPicture("album5", "friends")
+//    Thread.sleep(1000)
+//    system.actorSelection("/user/1") ! GetAlbum("user2", "album1")
+//    Thread.sleep(1000)
+//    system.actorSelection("/user/1") ! GetPictures("user2")
+//    Thread.sleep(1000)
+//    system.actorSelection("/user/3") ! GetPictures("user2")
 
   }
 
@@ -140,6 +144,15 @@ object Client {
     //    friendList += "i am a friend"
 
     def receive: Receive = {
+
+      case Schedule(id: String) =>
+
+        val m = Random.nextInt(userIDList.size())
+        self ! GetProfile("user" + m)
+        self ! GetFriendList("user" + m)
+        self ! GetTimeline("user" + m)
+        self ! PostMessage("user" + m, "This is a post from " + id + " to " +
+          "user" + m, privacyList.get(Random.nextInt(3)))
 
       case CreateUser =>
 
@@ -181,7 +194,7 @@ object Client {
 
         println("response: GetTimeline: " + response)
 
-      case PostMessageToFriend(friendID: String, content: String,
+      case PostMessage(friendID: String, content: String,
       privacy: String) =>
 
 
@@ -196,7 +209,7 @@ object Client {
         val response = Await.result(future, timeout.duration)
 
 
-        println("response: PostMessageToFriend: " + response)
+        println("response: PostMessage: " + response)
 
       case GetMyPosts =>
 
@@ -234,7 +247,7 @@ object Client {
           response)
 
       case PostPicture(albumID: String
-      ,privacy: String) =>
+      , privacy: String) =>
 
         val pixelImagebase64String = "R0lGODlhAQABAIAAAP///wAAACwAAAAAAQABAAACAkQBADs="
         val imageJSON = new Picture(System.currentTimeMillis().toString, id, albumID, privacy, pixelImagebase64String)
@@ -263,12 +276,12 @@ object Client {
 
         println("response: GetPictures: " + response)
 
-      case GetAlbum(requestorID: String,albumID: String) =>
+      case GetAlbum(requestorID: String, albumID: String) =>
 
         implicit val timeout = Timeout(10 seconds)
 
         val future = IO(Http)(system).ask(HttpRequest(GET, Uri(s"http://" +
-          serverIP + ":" + serverPort + "/album?albumowner="+requestorID+"&requestorid=" +
+          serverIP + ":" + serverPort + "/album?albumowner=" + requestorID + "&requestorid=" +
           id + "&requestedalbum=" + albumID)))
 
         val response = Await.result(future, timeout.duration)
@@ -281,13 +294,14 @@ object Client {
 
 }
 
+case class Schedule(id:String)
 case class CreateUser()
 
 case class GetProfile(id: String)
 
 case class GetTimeline(id: String)
 
-case class PostMessageToFriend(
+case class PostMessage(
                                 friendID: String, content: String,
                                 privacy: String)
 
@@ -297,8 +311,8 @@ case class MakeFriend(id: String)
 
 case class GetFriendList(id: String)
 
-case class PostPicture(albumID: String,privacy: String)
+case class PostPicture(albumID: String, privacy: String)
 
-case class GetAlbum(requestorID: String,albumID: String)
+case class GetAlbum(requestorID: String, albumID: String)
 
 case class GetPictures(id1: String)
