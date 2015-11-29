@@ -12,7 +12,10 @@ import spray.can.Http
 import spray.http.HttpMethods._
 import spray.http._
 import spray.httpx.unmarshalling.FormDataUnmarshallers
+import spray.json
 import spray.json._
+import scala.util.parsing.json._
+import scala.util.parsing.json.JSON
 
 import scala.collection.immutable._
 import scala.concurrent.Await
@@ -86,9 +89,9 @@ object Client {
     system.actorSelection("/user/4") ! PostMessageToFriend("user2",
       "Hi I am a private post dont dare read me", "private")
 
-    //    system.actorSelection("/user/1") ! GetMyPosts
-    //    Thread.sleep(1000)
-    //    system.actorSelection("/user/2") ! GetMyPosts
+        system.actorSelection("/user/1") ! GetMyPosts
+        Thread.sleep(1000)
+        system.actorSelection("/user/2") ! GetMyPosts
     Thread.sleep(1000)
 
 
@@ -255,7 +258,6 @@ object Client {
           id + "&requested=" + id1)))
 
         val response = Await.result(future, timeout.duration)
-
 
         println("response: GetPictures: " + response)
 

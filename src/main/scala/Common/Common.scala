@@ -35,6 +35,8 @@ object Common {
 
   case class Album(requestor: String, responseList: scala.collection.immutable.List[Picture])
 
+  case class PictureList(responseList: scala.collection.immutable.List[Picture])
+
   case object NotFound
 
   case object ProfileCreated
@@ -116,4 +118,8 @@ object Common {
   implicit def toFriends(friend_List: List[String]): List[String] = friend_List
 
   implicit def toUsersName(user: User): String = user.username
+
+  //implicit def toPictures(pictureList : PictureList): PictureList = pictureList
+
+  //implicit def toAlbum(album: Album): Album = Album(requestor = album.requestor,responseList=album.responseList )
 }

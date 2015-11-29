@@ -8,9 +8,10 @@ import akka.util.Timeout
 import akka.pattern.ask
 import com.typesafe.config.ConfigFactory
 import spray.can.Http
-import spray.http.StatusCodes
+import spray.http.{MediaTypes, StatusCodes}
 import spray.httpx.SprayJsonSupport._
 import spray.routing._
+import MediaTypes._
 
 import scala.collection.immutable.Map
 import scala.collection.mutable.ListBuffer
@@ -219,16 +220,13 @@ trait RestApi extends HttpService with ActorLogging {
       (path("picture") & get) {
         parameters("sender", "requested") { (from,to) => requestContext =>
           val responder = createResponder(requestContext)
-          getPictures(from,to)
-          responder ! AlbumResponse1
+          responder ! getPictures(from,to)
         }
       }~
       (path("album") & get) {
         parameters("albumowner", "requestorid", "requestedalbum") { (owner, requestedby, albumID) => requestContext =>
           val responder = createResponder(requestContext)
-          println("in server path: albumowner=" + owner + "; requestedBy="+requestedby+"; albumID=" + albumID)
-          getAlbum(owner, requestedby, albumID)
-          responder ! AlbumResponse1
+          responder ! getAlbum(owner, requestedby, albumID)
         }
       }
 
@@ -347,7 +345,7 @@ trait RestApi extends HttpService with ActorLogging {
     new TimelineResponse(to, requestedPostList)
   }
 
-  private def getPictures(from: String, to: String): Album
+  private def getPictures(from: String, to: String): List[Picture]
   = {
 
     println("in server getPictures: 1")
@@ -382,10 +380,10 @@ trait RestApi extends HttpService with ActorLogging {
     }
     println("requestedPictureList: " + requestedPictureList)
 
-    new Album(to, requestedPictureList)
+    requestedPictureList
   }
 
-  private def getAlbum(owner: String, requestedby: String, albumID: String): Album
+  private def getAlbum(owner: String, requestedby: String, albumID: String): List[Picture]
   = {
 
     println("in server getAlbum: 1")
@@ -419,9 +417,7 @@ trait RestApi extends HttpService with ActorLogging {
       }
     }
 
-    println("requestedAlbumList: " + requestedAlbumList)
-    //    requestedPostList.map(toPosts)
-    new Album(requestedby, requestedAlbumList)
+    requestedAlbumList
   }
 
   private def getUserID(id: String): Option[User] = {
