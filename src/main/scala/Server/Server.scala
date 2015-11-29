@@ -378,6 +378,19 @@ trait RestApi extends HttpService with ActorLogging {
           println("in server:getPictures: No pictures whatsoever")
       }
     }
+    else{
+      allUserPicturesMap.get(from) match {
+        case Some(x) =>
+          x.foreach(
+            y => if (
+              (y.privacy.equalsIgnoreCase("public"))
+            )
+              requestedPictureList = requestedPictureList :+ y
+          )
+        case None =>
+          println("in server:getPictures: No pictures whatsoever")
+      }
+    }
     println("requestedPictureList: " + requestedPictureList)
 
     requestedPictureList
@@ -408,6 +421,20 @@ trait RestApi extends HttpService with ActorLogging {
             y => if (
               (y.privacy.equalsIgnoreCase("public") ||
                 y.privacy.equalsIgnoreCase("friends"))
+                && y.albumID.equalsIgnoreCase(albumID)
+            )
+              requestedAlbumList = requestedAlbumList :+ y
+          )
+        case None =>
+          println("in server:getTimeline: No albums whatsoever")
+      }
+    }
+    else{
+      allUserPicturesMap.get(owner) match {
+        case Some(x) =>
+          x.foreach(
+            y => if (
+              (y.privacy.equalsIgnoreCase("public"))
                 && y.albumID.equalsIgnoreCase(albumID)
             )
               requestedAlbumList = requestedAlbumList :+ y

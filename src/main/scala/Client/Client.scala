@@ -104,16 +104,18 @@ object Client {
 
     system.actorSelection("/user/1") ! GetTimeline("user2")
 
-    system.actorSelection("/user/1") ! PostPicture("album1","public")
+    system.actorSelection("/user/2") ! PostPicture("album1","public")
     system.actorSelection("/user/1") ! PostPicture("album2","public")
-    system.actorSelection("/user/1") ! PostPicture("album3","friends")
-    system.actorSelection("/user/1") ! PostPicture("album1","friends")
-    system.actorSelection("/user/1") ! PostPicture("album1","private")
+    system.actorSelection("/user/2") ! PostPicture("album3","friends")
+    system.actorSelection("/user/2") ! PostPicture("album1","friends")
+    system.actorSelection("/user/1") ! PostPicture("album1","public")
     system.actorSelection("/user/1") ! PostPicture("album5", "friends")
     Thread.sleep(1000)
     system.actorSelection("/user/1") ! GetAlbum("user2","album1")
     Thread.sleep(1000)
     system.actorSelection("/user/1") ! GetPictures("user2")
+    Thread.sleep(1000)
+    system.actorSelection("/user/3") ! GetPictures("user2")
 
 
   }
@@ -255,7 +257,7 @@ object Client {
 
         val future = IO(Http)(system).ask(HttpRequest(GET, Uri(s"http://" +
           serverIP + ":" + serverPort + "/picture?sender=" +
-          id + "&requested=" + id1)))
+          id1 + "&requested=" + id)))
 
         val response = Await.result(future, timeout.duration)
 
@@ -266,8 +268,8 @@ object Client {
         implicit val timeout = Timeout(10 seconds)
 
         val future = IO(Http)(system).ask(HttpRequest(GET, Uri(s"http://" +
-          serverIP + ":" + serverPort + "/album?albumowner="+id+"&requestorid=" +
-          requestorID + "&requestedalbum=" + albumID)))
+          serverIP + ":" + serverPort + "/album?albumowner="+requestorID+"&requestorid=" +
+          id + "&requestedalbum=" + albumID)))
 
         val response = Await.result(future, timeout.duration)
 
