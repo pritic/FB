@@ -27,9 +27,9 @@ object Client {
 
   val userIDList: util.HashSet[String] = new util.HashSet[String]()
   val privacyList: util.HashMap[Int, String] = new util.HashMap[Int, String]()
-  privacyList.put(1, "public")
-  privacyList.put(2, "private")
-  privacyList.put(3, "friends")
+  privacyList.put(0, "friends")
+  privacyList.put(1, "private")
+  privacyList.put(2, "public")
 
   def main(args: Array[String]): Unit = {
 
@@ -67,7 +67,7 @@ object Client {
         "about" + i, serverIP, serverPort, system)), i.toString)
 
       client ! CreateUser
-      system.scheduler.schedule(10000 millis, 10000 millis, client, Schedule
+      system.scheduler.schedule(5000 millis, 5000 millis, client, Schedule
       ("user" + Random.nextInt(userIDList.size())))
     }
 
@@ -145,14 +145,14 @@ object Client {
 
     def receive: Receive = {
 
-      case Schedule(id: String) =>
+      case Schedule(id1: String) =>
 
         val m = Random.nextInt(userIDList.size())
-        self ! GetProfile("user" + m)
-        self ! GetFriendList("user" + m)
-        self ! GetTimeline("user" + m)
-        self ! PostMessage("user" + m, "This is a post from " + id + " to " +
-          "user" + m, privacyList.get(Random.nextInt(3)))
+//        self ! GetProfile("user" + m)
+//        self ! GetFriendList("user" + m)
+        self ! GetTimeline(id1)
+        self ! PostMessage(id1, "This is a post from " + id + " to " +
+          id1, privacyList.get(Random.nextInt(3)))
 
       case CreateUser =>
 

@@ -13,7 +13,7 @@ import spray.httpx.SprayJsonSupport._
 import spray.routing._
 import MediaTypes._
 
-import scala.collection.immutable.Map
+import scala.collection.immutable.{HashMap, Map}
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.duration._
 import scala.language.postfixOps
@@ -129,34 +129,11 @@ trait RestApi extends HttpService with ActorLogging {
           }
         }
     } ~
-      //      pathPrefix("timeline") {
-      //        path(Segment) { id =>
-      //          get { requestContext =>
-      //            val responder = createResponder(requestContext)
-      //            getTimeline(id).map(responder ! _)
-      //              .getOrElse(responder ! NotFound)
-      //          }
-      //        }
       (path("timeline") & get) {
         parameters("sender", "requested") { (from, to) => requestContext =>
           val responder = createResponder(requestContext)
-          println("in server path: from=" + from + "; to=" + to)
-          getTimeline(from, to)
-          responder ! TimelineResponse1
-          //            .getOrElse(responder ! NotFound)
-
-          //          }
+          responder ! getTimeline(from, to)
         }
-
-        //        pathEnd {
-        //          get {
-        //            entity(as[TimelineRequest]) { timelineRequest => requestContext =>
-        //              val responder = createResponder(requestContext)
-        //              getTimeline(timelineRequest).map(responder ! _)
-        ////                .getOrElse(responder ! NotFound)
-        //            }
-        //          }
-        //        }
       } ~
       pathPrefix("profile") {
         path(Segment) { id =>
@@ -205,7 +182,7 @@ trait RestApi extends HttpService with ActorLogging {
               .getOrElse(responder ! NotFound)
           }
         }
-      }~
+      } ~
       pathPrefix("picture") {
         pathEnd {
           post {
@@ -216,20 +193,19 @@ trait RestApi extends HttpService with ActorLogging {
             }
           }
         }
-      }~
+      } ~
       (path("picture") & get) {
-        parameters("sender", "requested") { (from,to) => requestContext =>
+        parameters("sender", "requested") { (from, to) => requestContext =>
           val responder = createResponder(requestContext)
-          responder ! getPictures(from,to)
+          responder ! getPictures(from, to)
         }
-      }~
+      } ~
       (path("album") & get) {
         parameters("albumowner", "requestorid", "requestedalbum") { (owner, requestedby, albumID) => requestContext =>
           val responder = createResponder(requestContext)
           responder ! getAlbum(owner, requestedby, albumID)
         }
       }
-
 
   private def createResponder(requestContext: RequestContext) = {
 
@@ -268,7 +244,8 @@ trait RestApi extends HttpService with ActorLogging {
   }
 
   private def createPicture(picture: Picture): Unit = {
-    allUserPicturesMap.get(picture.from) match{
+
+    allUserPicturesMap.get(picture.from) match {
       case Some(x) =>
         val y = picture :: x
         allUserPicturesMap = allUserPicturesMap + (picture.from -> y)
@@ -299,50 +276,78 @@ trait RestApi extends HttpService with ActorLogging {
     getUserID(id).map(toUsersName)
   }
 
-  private def getTimeline(from: String, to: String): TimelineResponse
+  private def getTimeline(from: String, to: String): List[Post]
   = {
 
-    println("in server getTimeline: 1")
-    getUsersName(to)
+    println("========================================")
+    println(from + " is requesting " + to + "'s timeline")
     var requestedPostList: List[Post] = List[Post]()
     var isFriend: Boolean = false
     println(allUserPostsMap.get(to))
     println(allUserFriendMap.get(from))
 
-
-    allUserFriendMap.get(from) match {
-      case Some(a) =>
-        if (a.contains(to))
-          isFriend = true
-        else
-          println("in server:getTimeline: not a friend")
-      case None =>
-        println("in server:getTimeline: allUserFriendMap.get(from) did not " +
-          "return anything")
-    }
-
-    if (isFriend) {
+    if (from.equalsIgnoreCase(to)) {
+      println(from + " is requesting its own timeline")
       allUserPostsMap.get(to) match {
         case Some(x) =>
-          println("x: " + x)
+          //          println("x: " + x)
           x.foreach(
-            y => if (
-              (y.privacy.equalsIgnoreCase("public") ||
-                y.privacy.equalsIgnoreCase("friends"))
-                && y.to.equalsIgnoreCase(from)
-                || y.from.equalsIgnoreCase(from))
+            y =>
               requestedPostList = requestedPostList :+ y
           )
+          println(requestedPostList)
         case None =>
-          println("in server:getTimeline: No posts whatsoever")
+          println("getTimeline: " + from + " has no posts")
       }
     }
+    else {
+      allUserFriendMap.get(from) match {
+        case Some(a) =>
+          if (a.contains(to))
+            isFriend = true
+          else
+            println("getTimeline: not a friend")
+        case None =>
+          println("getTimeline: " + from + " does not have any friends")
+      }
 
-    println("in server getTimeline: 2")
-    println("requestedPostList: " + requestedPostList)
-    println(allUserPostsMap.get(to))
-    //    requestedPostList.map(toPosts)
-    new TimelineResponse(to, requestedPostList)
+      if (isFriend) {
+        allUserPostsMap.get(to) match {
+          case Some(x) =>
+            //          println("x: " + x)
+            x.foreach(
+              y => if (
+                (y.privacy.equalsIgnoreCase("public") ||
+                  y.privacy.equalsIgnoreCase("friends"))
+                  && y.to.equalsIgnoreCase(from)
+                  || y.from.equalsIgnoreCase(from))
+                requestedPostList = requestedPostList :+ y
+            )
+            println(requestedPostList)
+          case None =>
+            println("getTimeline: " + to + " has no posts")
+        }
+      }
+      else {
+        allUserPostsMap.get(to) match {
+          case Some(x) =>
+            //          println("x: " + x)
+            x.foreach(
+              y => if (
+                y.privacy.equalsIgnoreCase("public")
+                  || y.to.equalsIgnoreCase(from)
+                  || y.from.equalsIgnoreCase(from))
+                requestedPostList = requestedPostList :+ y
+            )
+            println(requestedPostList)
+          case None =>
+            println("getTimeline: " + to + " has no posts")
+        }
+      }
+    }
+    println("========================================")
+
+    requestedPostList
   }
 
   private def getPictures(from: String, to: String): List[Picture]
@@ -378,7 +383,7 @@ trait RestApi extends HttpService with ActorLogging {
           println("in server:getPictures: No pictures whatsoever")
       }
     }
-    else{
+    else {
       allUserPicturesMap.get(from) match {
         case Some(x) =>
           x.foreach(
@@ -429,7 +434,7 @@ trait RestApi extends HttpService with ActorLogging {
           println("in server:getTimeline: No albums whatsoever")
       }
     }
-    else{
+    else {
       allUserPicturesMap.get(owner) match {
         case Some(x) =>
           x.foreach(
@@ -519,10 +524,10 @@ class Responder(requestContext: RequestContext) extends Actor with ActorLogging 
       requestContext.complete(StatusCodes.OK, posts)
       killYourself
 
-    case TimelineResponse1 =>
-      println("in server case posts")
-      requestContext.complete(StatusCodes.OK)
-      killYourself
+//    case TimelineResponse1 =>
+//      //      println("in server case posts")
+//      requestContext.complete(StatusCodes.OK)
+//      killYourself
 
     case AlbumResponse1 =>
       println("in server case album/picture")
@@ -533,10 +538,6 @@ class Responder(requestContext: RequestContext) extends Actor with ActorLogging 
       println("in server: case friends")
       requestContext.complete(StatusCodes.OK, friends)
       killYourself
-
-    //    case listBufferPost : ListBuffer[Post] =>
-    //      requestContext.complete(StatusCodes.OK, listBufferPost)
-    //      killYourself
 
     case NotFound =>
       requestContext.complete(StatusCodes.NotFound)
