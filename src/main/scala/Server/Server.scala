@@ -1,7 +1,5 @@
 package Server
 
-import java.util
-
 import akka.actor._
 import akka.io.IO
 import akka.util.Timeout
@@ -11,10 +9,8 @@ import spray.can.Http
 import spray.http.{MediaTypes, StatusCodes}
 import spray.httpx.SprayJsonSupport._
 import spray.routing._
-import MediaTypes._
 
-import scala.collection.immutable.{HashMap, Map}
-import scala.collection.mutable.ListBuffer
+import scala.collection.immutable.{Map}
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
@@ -25,7 +21,7 @@ object Server {
 
   def main(args: Array[String]): Unit = {
 
-    val configfactory = ConfigFactory.parseString(
+    val configFactory = ConfigFactory.parseString(
       """
     akka {
       loglevel = INFO
@@ -56,11 +52,11 @@ object Server {
       """
     )
 
-    val config = ConfigFactory.load(configfactory)
+    val config = ConfigFactory.load(configFactory)
     val host = config.getString("http.host")
     val port = config.getInt("http.port")
 
-    implicit val system = ActorSystem("FB", ConfigFactory.load(configfactory));
+    implicit val system = ActorSystem("FB", ConfigFactory.load(configFactory));
 
     val master = system.actorOf(Props(new RestInterface()), "httpInterface")
 
@@ -93,8 +89,6 @@ trait RestApi extends HttpService with ActorLogging {
   import Common.Common._
 
   implicit val timeout = Timeout(50 seconds)
-
-  //  var quizzes = Vector[Quiz]()
 
   var users = Vector[User]()
 
@@ -256,8 +250,6 @@ trait RestApi extends HttpService with ActorLogging {
   }
 
   private def getPosts(id: String): Option[List[Post]] = {
-
-    println("i am in server:getPosts; id: " + id)
     allUserPostsMap.get(id).map(toPosts)
   }
 
@@ -290,7 +282,6 @@ trait RestApi extends HttpService with ActorLogging {
       println(from + " is requesting its own timeline")
       allUserPostsMap.get(to) match {
         case Some(x) =>
-          //          println("x: " + x)
           x.foreach(
             y =>
               requestedPostList = requestedPostList :+ y
@@ -314,7 +305,6 @@ trait RestApi extends HttpService with ActorLogging {
       if (isFriend) {
         allUserPostsMap.get(to) match {
           case Some(x) =>
-            //          println("x: " + x)
             x.foreach(
               y => if (
                 (y.privacy.equalsIgnoreCase("public") ||
@@ -374,8 +364,8 @@ trait RestApi extends HttpService with ActorLogging {
         case Some(x) =>
           x.foreach(
             y => if (
-              (y.privacy.equalsIgnoreCase("public") ||
-                y.privacy.equalsIgnoreCase("friends"))
+              y.privacy.equalsIgnoreCase("public") ||
+                y.privacy.equalsIgnoreCase("friends")
             )
               requestedPictureList = requestedPictureList :+ y
           )
@@ -388,7 +378,7 @@ trait RestApi extends HttpService with ActorLogging {
         case Some(x) =>
           x.foreach(
             y => if (
-              (y.privacy.equalsIgnoreCase("public"))
+              y.privacy.equalsIgnoreCase("public")
             )
               requestedPictureList = requestedPictureList :+ y
           )
@@ -439,7 +429,7 @@ trait RestApi extends HttpService with ActorLogging {
         case Some(x) =>
           x.foreach(
             y => if (
-              (y.privacy.equalsIgnoreCase("public"))
+              y.privacy.equalsIgnoreCase("public")
                 && y.albumID.equalsIgnoreCase(albumID)
             )
               requestedAlbumList = requestedAlbumList :+ y
@@ -520,14 +510,8 @@ class Responder(requestContext: RequestContext) extends Actor with ActorLogging 
       killYourself
 
     case posts: List[Post] =>
-      //      println("in server case posts")
       requestContext.complete(StatusCodes.OK, posts)
       killYourself
-
-//    case TimelineResponse1 =>
-//      //      println("in server case posts")
-//      requestContext.complete(StatusCodes.OK)
-//      killYourself
 
     case AlbumResponse1 =>
       println("in server case album/picture")

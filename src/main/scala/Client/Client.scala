@@ -3,7 +3,7 @@ package Client
 import java.util
 
 import Common.Common._
-import akka.actor.{Actor, ActorSystem, Props}
+import akka.actor.{PoisonPill, Actor, ActorSystem, Props}
 import akka.io.IO
 import akka.pattern.ask
 import akka.util.Timeout
@@ -28,12 +28,12 @@ object Client {
   val userIDList: util.HashSet[String] = new util.HashSet[String]()
   val privacyList: util.HashMap[Int, String] = new util.HashMap[Int, String]()
   privacyList.put(0, "friends")
-  privacyList.put(1, "private")
-  privacyList.put(2, "public")
+  privacyList.put(1, "public")
+  privacyList.put(2, "private")
 
   def main(args: Array[String]): Unit = {
 
-    val configfactory = ConfigFactory.parseString(
+    val configFactory = ConfigFactory.parseString(
       """
     akka {
       loglevel = "ERROR"
@@ -52,13 +52,12 @@ object Client {
     }
       """
     )
-
     val serverIP = args(0)
     val serverPort = args(1)
     val numOfUsers = args(2).toInt
 
     implicit var system = ActorSystem("FBClient", ConfigFactory.load
-    (configfactory))
+    (configFactory))
 
     for (i <- 1 to numOfUsers) {
       userIDList.add("user" + i)
@@ -67,60 +66,10 @@ object Client {
         "about" + i, serverIP, serverPort, system)), i.toString)
 
       client ! CreateUser
-      system.scheduler.schedule(5000 millis, 5000 millis, client, Schedule
+
+      system.scheduler.schedule(100 millis, 5000 millis, client, Schedule
       ("user" + Random.nextInt(userIDList.size())))
     }
-
-//    system.actorSelection("/user/1") ! MakeFriend("user2")
-//    Thread.sleep(1000)
-//
-//    //    Thread.sleep(1000)
-//
-//    system.actorSelection("/user/1") ! PostMessage("user2",
-//      "Hi I am a message post", "friends")
-//
-//    Thread.sleep(1000)
-//
-//    system.actorSelection("/user/1") ! PostMessage("user3",
-//      "Hi I am a message post", "friends")
-//
-//    Thread.sleep(1000)
-//
-//    system.actorSelection("/user/1") ! PostMessage("user4",
-//      "Hi I am a message post", "public")
-//
-//    Thread.sleep(1000)
-//
-//    system.actorSelection("/user/4") ! PostMessage("user2",
-//      "Hi I am a private post dont dare read me", "private")
-//
-//    system.actorSelection("/user/1") ! GetMyPosts
-//    Thread.sleep(1000)
-//    system.actorSelection("/user/2") ! GetMyPosts
-//    Thread.sleep(1000)
-
-
-
-    //    system.actorSelection("/user/1") ! GetFriendList("user1")
-    //    Thread.sleep(1000)
-    //    system.actorSelection("/user/2") ! GetFriendList("user1")
-    //    Thread.sleep(1000)
-    //    system.actorSelection("/user/2") ! GetFriendList("user2")
-
-//    system.actorSelection("/user/1") ! GetTimeline("user2")
-//
-//    system.actorSelection("/user/2") ! PostPicture("album1", "public")
-//    system.actorSelection("/user/1") ! PostPicture("album2", "public")
-//    system.actorSelection("/user/2") ! PostPicture("album3", "friends")
-//    system.actorSelection("/user/2") ! PostPicture("album1", "friends")
-//    system.actorSelection("/user/1") ! PostPicture("album1", "public")
-//    system.actorSelection("/user/1") ! PostPicture("album5", "friends")
-//    Thread.sleep(1000)
-//    system.actorSelection("/user/1") ! GetAlbum("user2", "album1")
-//    Thread.sleep(1000)
-//    system.actorSelection("/user/1") ! GetPictures("user2")
-//    Thread.sleep(1000)
-//    system.actorSelection("/user/3") ! GetPictures("user2")
 
   }
 
@@ -141,18 +90,25 @@ object Client {
     var friendList: Set[String] = new scala.collection.immutable
     .HashSet[String]
 
-    //    friendList += "i am a friend"
-
     def receive: Receive = {
 
       case Schedule(id1: String) =>
 
-        val m = Random.nextInt(userIDList.size())
-//        self ! GetProfile("user" + m)
-//        self ! GetFriendList("user" + m)
-        self ! GetTimeline(id1)
+        self ! GetProfile(id1)
+        self ! MakeFriend(id1)
+        self ! GetFriendList(id1)
         self ! PostMessage(id1, "This is a post from " + id + " to " +
           id1, privacyList.get(Random.nextInt(3)))
+        self ! GetMyPosts
+        self ! GetTimeline(id1)
+        self ! PostPicture("album1", privacyList.get(Random.nextInt(2)))
+        self ! PostPicture("album2", privacyList.get(Random.nextInt(2)))
+        self ! GetPictures(id1)
+        self ! GetAlbum(id1, "album1")
+        self ! GetAlbum(id1, "album2")
+
+        Thread.sleep(100)
+        self ! PoisonPill
 
       case CreateUser =>
 
@@ -164,7 +120,6 @@ object Client {
           serverIP + ":" + serverPort + "/user")).withEntity(HttpEntity(ContentType(MediaTypes.`application/json`), userJSON.toString()))).mapTo[HttpResponse]
 
         val response = Await.result(future, timeout.duration)
-
 
         println("responseCreateProfile: " + response)
 
@@ -182,8 +137,6 @@ object Client {
       case GetTimeline(id1: String) =>
 
         implicit val timeout = Timeout(10 seconds)
-
-        //        val timelineRequestJSON = new TimelineRequest(id, id1).toJson
 
         val future = IO(Http)(system).ask(HttpRequest(GET, Uri(s"http://" +
           serverIP + ":" + serverPort + "/timeline?sender=" +
@@ -246,8 +199,7 @@ object Client {
         println("response: GetFriendList: " + id + " is getting friends" +
           response)
 
-      case PostPicture(albumID: String
-      , privacy: String) =>
+      case PostPicture(albumID: String, privacy: String) =>
 
         val pixelImagebase64String = "R0lGODlhAQABAIAAAP///wAAACwAAAAAAQABAAACAkQBADs="
         val imageJSON = new Picture(System.currentTimeMillis().toString, id, albumID, privacy, pixelImagebase64String)
@@ -265,8 +217,6 @@ object Client {
       case GetPictures(id1: String) =>
 
         implicit val timeout = Timeout(10 seconds)
-
-        //        val timelineRequestJSON = new TimelineRequest(id, id1).toJson
 
         val future = IO(Http)(system).ask(HttpRequest(GET, Uri(s"http://" +
           serverIP + ":" + serverPort + "/picture?sender=" +
@@ -294,7 +244,8 @@ object Client {
 
 }
 
-case class Schedule(id:String)
+case class Schedule(id: String)
+
 case class CreateUser()
 
 case class GetProfile(id: String)
@@ -302,8 +253,8 @@ case class GetProfile(id: String)
 case class GetTimeline(id: String)
 
 case class PostMessage(
-                                friendID: String, content: String,
-                                privacy: String)
+                        friendID: String, content: String,
+                        privacy: String)
 
 case class GetMyPosts()
 
