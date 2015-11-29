@@ -110,6 +110,8 @@ object Client {
         Thread.sleep(100)
         self ! PoisonPill
 
+
+
       case CreateUser =>
 
         implicit val timeout = Timeout(10 seconds)
@@ -201,8 +203,13 @@ object Client {
 
       case PostPicture(albumID: String, privacy: String) =>
 
-        val pixelImagebase64String = "R0lGODlhAQABAIAAAP///wAAACwAAAAAAQABAAACAkQBADs="
-        val imageJSON = new Picture(System.currentTimeMillis().toString, id, albumID, privacy, pixelImagebase64String)
+        val is = this.getClass.getClassLoader().getResourceAsStream("picture.jpg");
+        val stream = Stream.continually(is.read).takeWhile(_ != -1).map(_.toByte)
+        val bytes = stream.toArray
+        val pictureBase64String = new sun.misc.BASE64Encoder().encode(bytes)
+
+        //val pixelImagebase64String = "R0lGODlhAQABAIAAAP///wAAACwAAAAAAQABAAACAkQBADs="
+        val imageJSON = new Picture(System.currentTimeMillis().toString, id, albumID, privacy, pictureBase64String)
           .toJson
 
         implicit val timeout = Timeout(10 seconds)
