@@ -149,11 +149,13 @@ object Client {
 
         val m = Random.nextInt(userIDList.size())
 
+
 //        self ! GetProfile("user" + m)
 //        self ! GetFriendList("user" + m)
         self ! GetTimeline(id1)
         self ! PostMessage(id1, "This is a post from " + id + " to " +
           id1, privacyList.get(Random.nextInt(3)))
+
 
 
       case CreateUser =>
