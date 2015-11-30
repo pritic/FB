@@ -280,6 +280,8 @@ trait RestApi extends HttpService with ActorLogging {
             y =>
               requestedPostList = requestedPostList :+ y
           )
+        case None =>
+          print("")
       }
     }
     else {
@@ -287,6 +289,8 @@ trait RestApi extends HttpService with ActorLogging {
         case Some(a) =>
           if (a.contains(to))
             isFriend = true
+        case None =>
+          print("")
       }
 
       if (isFriend) {
@@ -300,6 +304,8 @@ trait RestApi extends HttpService with ActorLogging {
                   || y.from.equalsIgnoreCase(from))
                 requestedPostList = requestedPostList :+ y
             )
+          case None =>
+            print("")
         }
       }
       else {
@@ -312,9 +318,12 @@ trait RestApi extends HttpService with ActorLogging {
                   || y.from.equalsIgnoreCase(from))
                 requestedPostList = requestedPostList :+ y
             )
+          case None =>
+            print("")
         }
       }
     }
+
     requestedPostList
   }
 
@@ -329,6 +338,8 @@ trait RestApi extends HttpService with ActorLogging {
       case Some(a) =>
         if (a.contains(to))
           isFriend = true
+      case None =>
+        print("")
     }
 
     if (isFriend) {
@@ -341,6 +352,8 @@ trait RestApi extends HttpService with ActorLogging {
             )
               requestedPictureList = requestedPictureList :+ y
           )
+        case None =>
+          print("")
       }
     }
     else {
@@ -352,8 +365,11 @@ trait RestApi extends HttpService with ActorLogging {
             )
               requestedPictureList = requestedPictureList :+ y
           )
+        case None =>
+          print("")
       }
     }
+
     requestedPictureList
   }
 
@@ -367,6 +383,8 @@ trait RestApi extends HttpService with ActorLogging {
       case Some(a) =>
         if (a.contains(requestedby))
           isFriend = true
+      case None =>
+        print("")
     }
 
     if (isFriend) {
@@ -380,6 +398,8 @@ trait RestApi extends HttpService with ActorLogging {
             )
               requestedAlbumList = requestedAlbumList :+ y
           )
+        case None =>
+          print("")
       }
     }
     else {
@@ -392,8 +412,11 @@ trait RestApi extends HttpService with ActorLogging {
             )
               requestedAlbumList = requestedAlbumList :+ y
           )
+        case None =>
+          print("")
       }
     }
+
     requestedAlbumList
   }
 
@@ -432,6 +455,9 @@ trait RestApi extends HttpService with ActorLogging {
     allUserFriendMap.get(id) match {
       case Some(x) =>
         x
+      case None =>
+        val l: List[String] = List[String]()
+        l
     }
   }
 }
