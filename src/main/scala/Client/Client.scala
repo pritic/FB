@@ -62,7 +62,7 @@ object Client {
 
     val b = System.currentTimeMillis()
 
-    for (i <- 1 to numOfUsers - 1) {
+    for (i <- 0 to numOfUsers - 2) {
       userIDList.add("user" + i)
 
       val client = system.actorOf(Props(new FBUser("user" + i, "name" + i,
@@ -117,8 +117,9 @@ object Client {
 
       case Schedule(id1: String) =>
 
+        if (!id.equalsIgnoreCase(id1))
+          self ! MakeFriend(id1)
         self ! GetProfile(id1)
-        self ! MakeFriend(id1)
         self ! GetFriendList(id1)
         self ! PostMessage(id1, "This is a post from " + id + " to " +
           id1, privacyList.get(Random.nextInt(3)))
@@ -137,12 +138,13 @@ object Client {
 
         implicit val timeout = Timeout(10 seconds)
 
+        if (!id.equalsIgnoreCase(id1))
+          self ? MakeFriend(id1)
         self ? GetProfile(id1)
-        self ? MakeFriend(id1)
         self ? GetFriendList(id1)
         self ? PostMessage(id1, "This is a post from " + id + " to " +
           id1, privacyList.get(Random.nextInt(3)))
-        self ! GetMyPosts
+        self ? GetMyPosts
         self ? GetTimeline(id1)
         self ? PostPicture("album1", privacyList.get(Random.nextInt(2)))
         self ? PostPicture("album2", privacyList.get(Random.nextInt(2)))
@@ -240,7 +242,7 @@ object Client {
 
         val response = Await.result(future, timeout.duration)
 
-        println("response: GetFriendList: " + id + " is getting friends" +
+        println("response: GetFriendList: " + id + " is getting " + id1 + "'s friends " +
           response)
 
       case PostPicture(albumID: String, privacy: String) =>

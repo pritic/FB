@@ -6,7 +6,7 @@ import akka.util.Timeout
 import akka.pattern.ask
 import com.typesafe.config.ConfigFactory
 import spray.can.Http
-import spray.http.{MediaTypes, StatusCodes}
+import spray.http.{StatusCodes}
 import spray.httpx.SprayJsonSupport._
 import spray.routing._
 
@@ -172,8 +172,7 @@ trait RestApi extends HttpService with ActorLogging {
         path(Segment) { id =>
           get { requestContext =>
             val responder = createResponder(requestContext)
-            getFriends(id).map(responder ! _.toString())
-              .getOrElse(responder ! NotFound)
+            responder ! getFriends(id).toString()
           }
         }
       } ~
@@ -250,6 +249,7 @@ trait RestApi extends HttpService with ActorLogging {
   }
 
   private def getPosts(id: String): Option[List[Post]] = {
+
     allUserPostsMap.get(id).map(toPosts)
   }
 
@@ -451,8 +451,9 @@ trait RestApi extends HttpService with ActorLogging {
 
     allUserFriendMap.get(friendRequest.from) match {
       case Some(x) =>
+        if (!x.contains(friendRequest.to)) {
         val y = friendRequest.to :: x
-        allUserFriendMap = allUserFriendMap + (friendRequest.from -> y)
+        allUserFriendMap = allUserFriendMap + (friendRequest.from -> y)}
       case None =>
         val y = List(friendRequest.to)
         allUserFriendMap = allUserFriendMap + (friendRequest.from -> y)
@@ -460,18 +461,28 @@ trait RestApi extends HttpService with ActorLogging {
 
     allUserFriendMap.get(friendRequest.to) match {
       case Some(x) =>
+        if (!x.contains(friendRequest.from)) {
         val y = friendRequest.from :: x
-        allUserFriendMap = allUserFriendMap + (friendRequest.to -> y)
+        allUserFriendMap = allUserFriendMap + (friendRequest.to -> y)}
       case None =>
         val y = List(friendRequest.from)
         allUserFriendMap = allUserFriendMap + (friendRequest.to -> y)
     }
+
+//    getUserID(friendRequest.from).get.friendList + friendRequest.to
+//
+//    getUserID(friendRequest.to).get.friendList + friendRequest.from
+
   }
 
-  private def getFriends(id: String): Option[List[String]] = {
+  private def getFriends(id: String): List[String] = {
 
     println("i am in server:getFriends; id: " + id)
-    allUserFriendMap.get(id).map(toFriends)
+    allUserFriendMap.get(id) match {
+      case Some(x) =>
+        x
+    }
+    //    getUserID(id).map(toFriend)
   }
 }
 
@@ -505,6 +516,10 @@ class Responder(requestContext: RequestContext) extends Actor with ActorLogging 
       requestContext.complete(StatusCodes.OK, profile)
       killYourself
 
+    case friend: Friend =>
+      requestContext.complete(StatusCodes.OK, friend)
+      killYourself
+
     case timeline: TimeLine =>
       requestContext.complete(StatusCodes.OK, timeline)
       killYourself
@@ -519,8 +534,8 @@ class Responder(requestContext: RequestContext) extends Actor with ActorLogging 
       killYourself
 
     case friends: String =>
-      println("in server: case friends")
-      requestContext.complete(StatusCodes.OK, friends)
+      println("in server: case friends line 526")
+      requestContext.complete(friends)
       killYourself
 
     case NotFound =>
