@@ -15,7 +15,7 @@ object Common {
                    friendList: scala.collection.immutable.Set[String]
                  )
 
-  case class Profile(username: String, about: String, friendList: scala.collection.immutable.Set[String])
+  case class Profile(username: String, about: String)
 
   case class TimeLine(
                        username: String, postList: scala.collection.immutable
@@ -30,6 +30,8 @@ object Common {
   case class Post(
                    date: String, from: String, to: String, privacy: String,
                    content: String)
+
+  case class Friend(username: String, friendList: scala.collection.immutable.Set[String])
 
   case class Picture(date: String, from: String, albumID: String, privacy: String, pictureContent: String)
 
@@ -54,6 +56,11 @@ object Common {
   case object AlbumResponse1
 
   /* json (un)marshalling */
+
+  object Friend extends DefaultJsonProtocol {
+
+    implicit val format = jsonFormat2(Friend.apply)
+  }
 
   object Picture extends DefaultJsonProtocol {
 
@@ -87,7 +94,7 @@ object Common {
 
   object Profile extends DefaultJsonProtocol {
 
-    implicit val format = jsonFormat3(Profile.apply)
+    implicit val format = jsonFormat2(Profile.apply)
   }
 
   object TimeLine extends DefaultJsonProtocol {
@@ -105,21 +112,17 @@ object Common {
     friendList = user.friendList)
 
   implicit def toProfile(user: User): Profile = Profile(username =
-    user.username, about = user.about, friendList = user.friendList)
+    user.username, about = user.about)
 
   implicit def toTimeline(user: User): TimeLine = TimeLine(username =
     user.username, postList = user.postList)
 
-  implicit def toPost(post: Post): Post = Post(date = post.date, from =
-    post.from, to = post.to, privacy = post.privacy, content = post.content)
-
   implicit def toPosts(post_List: List[Post]): List[Post] = post_List
+
+  implicit def toFriend(user: User): Friend = Friend(username =
+    user.username, friendList = user.friendList)
 
   implicit def toFriends(friend_List: List[String]): List[String] = friend_List
 
   implicit def toUsersName(user: User): String = user.username
-
-  //implicit def toPictures(pictureList : PictureList): PictureList = pictureList
-
-  //implicit def toAlbum(album: Album): Album = Album(requestor = album.requestor,responseList=album.responseList )
 }
