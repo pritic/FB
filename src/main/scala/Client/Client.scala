@@ -64,10 +64,10 @@ object Client {
 
       val client = system.actorOf(Props(new FBUser("user" + i, "name" + i,
         "about" + i, serverIP, serverPort, system)), i.toString)
-
+      Thread.sleep(10)
       client ! CreateUser
 
-      system.scheduler.schedule(100 millis, 5000 millis, client, Schedule
+      system.scheduler.scheduleOnce(10000 millis, client, Schedule
       ("user" + Random.nextInt(userIDList.size())))
     }
 
