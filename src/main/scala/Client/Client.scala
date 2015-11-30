@@ -1,6 +1,7 @@
 package Client
 
-import java.util
+import java.io.{FileWriter, BufferedWriter, File}
+import java.{lang, util}
 
 import Common.Common._
 import akka.actor.{PoisonPill, Actor, ActorSystem, Props}
@@ -59,7 +60,9 @@ object Client {
     implicit var system = ActorSystem("FBClient", ConfigFactory.load
     (configFactory))
 
-    for (i <- 1 to numOfUsers) {
+    val b = System.currentTimeMillis()
+
+    for (i <- 1 to numOfUsers - 1) {
       userIDList.add("user" + i)
 
       val client = system.actorOf(Props(new FBUser("user" + i, "name" + i,
@@ -69,7 +72,27 @@ object Client {
 
       system.scheduler.scheduleOnce(10000 millis, client, Schedule
       ("user" + Random.nextInt(userIDList.size())))
+
+      //      if (i == numOfUsers) {
+      //        system.scheduler.scheduleOnce(10000 millis, client, Schedule
+      //        ("user" + Random.nextInt(userIDList.size())))
+      //        println("Time taken: " + (System.currentTimeMillis() - b))
+      //      }
     }
+
+    val client = system.actorOf(Props(new FBUser("user" + numOfUsers, "name" + numOfUsers,
+      "about" + numOfUsers, serverIP, serverPort, system)), numOfUsers.toString)
+    //    Thread.sleep(10)
+    client ! CreateUser
+    system.scheduler.scheduleOnce(10000 millis, client, Schedule1
+    ("user" + Random.nextInt(userIDList.size()), b))
+
+    //    println("Time taken: " + (System.currentTimeMillis() - b))
+
+    //    val file = new File("output.txt")
+    //    val bw = new BufferedWriter(new FileWriter(file))
+    //    bw.write((System.currentTimeMillis() - b).toString)
+    //    bw.close()
 
   }
 
@@ -110,7 +133,26 @@ object Client {
         Thread.sleep(100)
         self ! PoisonPill
 
+      case Schedule1(id1: String, time: Long) =>
 
+        implicit val timeout = Timeout(10 seconds)
+
+        self ? GetProfile(id1)
+        self ? MakeFriend(id1)
+        self ? GetFriendList(id1)
+        self ? PostMessage(id1, "This is a post from " + id + " to " +
+          id1, privacyList.get(Random.nextInt(3)))
+        self ! GetMyPosts
+        self ? GetTimeline(id1)
+        self ? PostPicture("album1", privacyList.get(Random.nextInt(2)))
+        self ? PostPicture("album2", privacyList.get(Random.nextInt(2)))
+        self ? GetPictures(id1)
+        self ? GetAlbum(id1, "album1")
+        self ? GetAlbum(id1, "album2")
+
+        Thread.sleep(100)
+        self ? PoisonPill
+        println("Total time taken : " + (System.currentTimeMillis() - time) + "milliseconds")
 
       case CreateUser =>
 
@@ -189,7 +231,7 @@ object Client {
         val response = Await.result(future, timeout.duration)
 
 
-        println("response: MakeFriend: " + id + " is making friends" + response)
+        println("response: MakeFriend: " + id + " is making friends with " + id1 + " " + response)
 
       case GetFriendList(id1: String) =>
         implicit val timeout = Timeout(10 seconds)
@@ -252,6 +294,8 @@ object Client {
 }
 
 case class Schedule(id: String)
+
+case class Schedule1(id1: String, time: Long)
 
 case class CreateUser()
 
