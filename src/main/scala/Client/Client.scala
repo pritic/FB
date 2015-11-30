@@ -1,10 +1,9 @@
 package Client
 
-import java.io.{FileWriter, BufferedWriter, File}
-import java.{lang, util}
+import java.util
 
 import Common.Common._
-import akka.actor.{PoisonPill, Actor, ActorSystem, Props}
+import akka.actor.{Actor, ActorSystem, PoisonPill, Props}
 import akka.io.IO
 import akka.pattern.ask
 import akka.util.Timeout
@@ -17,9 +16,9 @@ import spray.json._
 
 import scala.collection.immutable._
 import scala.concurrent.Await
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.util.Random
-import scala.concurrent.ExecutionContext.Implicits.global
 
 /**
   * Created by Priti Changlani on 11/22/15 at 4:41 PM.
@@ -72,28 +71,13 @@ object Client {
 
       system.scheduler.scheduleOnce(10000 millis, client, Schedule
       ("user" + Random.nextInt(userIDList.size())))
-
-      //      if (i == numOfUsers) {
-      //        system.scheduler.scheduleOnce(10000 millis, client, Schedule
-      //        ("user" + Random.nextInt(userIDList.size())))
-      //        println("Time taken: " + (System.currentTimeMillis() - b))
-      //      }
     }
 
     val client = system.actorOf(Props(new FBUser("user" + numOfUsers, "name" + numOfUsers,
       "about" + numOfUsers, serverIP, serverPort, system)), numOfUsers.toString)
-    //    Thread.sleep(10)
     client ! CreateUser
     system.scheduler.scheduleOnce(10000 millis, client, Schedule1
     ("user" + Random.nextInt(userIDList.size()), b))
-
-    //    println("Time taken: " + (System.currentTimeMillis() - b))
-
-    //    val file = new File("output.txt")
-    //    val bw = new BufferedWriter(new FileWriter(file))
-    //    bw.write((System.currentTimeMillis() - b).toString)
-    //    bw.close()
-
   }
 
   class FBUser(
@@ -159,55 +143,38 @@ object Client {
       case CreateUser =>
 
         implicit val timeout = Timeout(10 seconds)
-
         val userJSON = new User(id, username, about, postList, friendList).toJson
-
         val future = IO(Http)(system).ask(HttpRequest(POST, Uri(s"http://" +
           serverIP + ":" + serverPort + "/user")).withEntity(HttpEntity(ContentType(MediaTypes.`application/json`), userJSON.toString()))).mapTo[HttpResponse]
-
         val response = Await.result(future, timeout.duration)
-
-        println("responseCreateProfile: " + response)
+        println("response: CreateUser: " + response)
 
       case GetProfile(id: String) =>
 
         implicit val timeout = Timeout(10 seconds)
         val future = IO(Http)(system).ask(HttpRequest(GET, Uri(s"http://" +
           serverIP + ":" + (serverPort) + "/profile/" + id)))
-
         val response = Await.result(future, timeout.duration)
-
-
-        println("responseProfile: " + response)
+        println("response: GetProfile: " + response)
 
       case GetTimeline(id1: String) =>
 
         implicit val timeout = Timeout(10 seconds)
-
         val future = IO(Http)(system).ask(HttpRequest(GET, Uri(s"http://" +
           serverIP + ":" + serverPort + "/timeline?sender=" +
           id + "&requested=" + id1)))
-
         val response = Await.result(future, timeout.duration)
-
-
         println("response: GetTimeline: " + response)
 
       case PostMessage(friendID: String, content: String,
       privacy: String) =>
 
-
         val postJSON = new Post(System.currentTimeMillis().toString, id, friendID, privacy, content)
           .toJson
-
         implicit val timeout = Timeout(10 seconds)
-
         val future = IO(Http)(system).ask(HttpRequest(POST, Uri(s"http://" +
           serverIP + ":" + serverPort + "/post")).withEntity(HttpEntity(ContentType(MediaTypes.`application/json`), postJSON.toString()))).mapTo[HttpResponse]
-
         val response = Await.result(future, timeout.duration)
-
-
         println("response: PostMessage: " + response)
 
       case GetMyPosts =>
@@ -215,33 +182,25 @@ object Client {
         implicit val timeout = Timeout(10 seconds)
         val future = IO(Http)(system).ask(HttpRequest(GET, Uri(s"http://" +
           serverIP + ":" + serverPort + "/post/" + id)))
-
         val response = Await.result(future, timeout.duration)
-
         println("response: GetMyPosts: " + response)
 
       case MakeFriend(id1: String) =>
 
         implicit val timeout = Timeout(10 seconds)
-
         val friendRequestJSON = new FriendRequest(id, id1).toJson
-
         val future = IO(Http)(system).ask(HttpRequest(POST, Uri(s"http://" +
           serverIP + ":" + serverPort + "/makefriend")).withEntity
         (HttpEntity(ContentType(MediaTypes.`application/json`), friendRequestJSON.toString()))).mapTo[HttpResponse]
-
         val response = Await.result(future, timeout.duration)
-
-
         println("response: MakeFriend: " + id + " is making friends with " + id1 + " " + response)
 
       case GetFriendList(id1: String) =>
+
         implicit val timeout = Timeout(10 seconds)
         val future = IO(Http)(system).ask(HttpRequest(GET, Uri(s"http://" +
           serverIP + ":" + serverPort + "/getfriends/" + id1)))
-
         val response = Await.result(future, timeout.duration)
-
         println("response: GetFriendList: " + id + " is getting " + id1 + "'s friends " +
           response)
 
@@ -251,45 +210,31 @@ object Client {
         val stream = Stream.continually(is.read).takeWhile(_ != -1).map(_.toByte)
         val bytes = stream.toArray
         val pictureBase64String = new sun.misc.BASE64Encoder().encode(bytes)
-
-        //val pixelImagebase64String = "R0lGODlhAQABAIAAAP///wAAACwAAAAAAQABAAACAkQBADs="
         val imageJSON = new Picture(System.currentTimeMillis().toString, id, albumID, privacy, pictureBase64String)
           .toJson
-
         implicit val timeout = Timeout(10 seconds)
-
         val future = IO(Http)(system).ask(HttpRequest(POST, Uri(s"http://" +
           serverIP + ":" + serverPort + "/picture")).withEntity(HttpEntity(ContentType(MediaTypes.`application/json`), imageJSON.toString()))).mapTo[HttpResponse]
-
         val response = Await.result(future, timeout.duration)
-
         println("response: PostPicture: " + response)
 
       case GetPictures(id1: String) =>
 
         implicit val timeout = Timeout(10 seconds)
-
         val future = IO(Http)(system).ask(HttpRequest(GET, Uri(s"http://" +
           serverIP + ":" + serverPort + "/picture?sender=" +
           id1 + "&requested=" + id)))
-
         val response = Await.result(future, timeout.duration)
-
         println("response: GetPictures: " + response)
 
       case GetAlbum(requestorID: String, albumID: String) =>
 
         implicit val timeout = Timeout(10 seconds)
-
         val future = IO(Http)(system).ask(HttpRequest(GET, Uri(s"http://" +
           serverIP + ":" + serverPort + "/album?albumowner=" + requestorID + "&requestorid=" +
           id + "&requestedalbum=" + albumID)))
-
         val response = Await.result(future, timeout.duration)
-
-
         println("response: GetAlbum: " + response)
-
     }
   }
 

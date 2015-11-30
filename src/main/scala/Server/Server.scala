@@ -2,15 +2,15 @@ package Server
 
 import akka.actor._
 import akka.io.IO
-import akka.util.Timeout
 import akka.pattern.ask
+import akka.util.Timeout
 import com.typesafe.config.ConfigFactory
 import spray.can.Http
-import spray.http.{StatusCodes}
+import spray.http.StatusCodes
 import spray.httpx.SprayJsonSupport._
 import spray.routing._
 
-import scala.collection.immutable.{Map}
+import scala.collection.immutable.Map
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
@@ -210,7 +210,6 @@ trait RestApi extends HttpService with ActorLogging {
     val doesNotExist = !users.exists(_.id == user.id)
     if (doesNotExist) {
       users = users :+ user
-      //      print(users)
     }
     doesNotExist
   }
@@ -271,24 +270,16 @@ trait RestApi extends HttpService with ActorLogging {
   private def getTimeline(from: String, to: String): List[Post]
   = {
 
-    println("========================================")
-    println(from + " is requesting " + to + "'s timeline")
     var requestedPostList: List[Post] = List[Post]()
     var isFriend: Boolean = false
-    println(allUserPostsMap.get(to))
-    println(allUserFriendMap.get(from))
 
     if (from.equalsIgnoreCase(to)) {
-      println(from + " is requesting its own timeline")
       allUserPostsMap.get(to) match {
         case Some(x) =>
           x.foreach(
             y =>
               requestedPostList = requestedPostList :+ y
           )
-          println(requestedPostList)
-        case None =>
-          println("getTimeline: " + from + " has no posts")
       }
     }
     else {
@@ -296,10 +287,6 @@ trait RestApi extends HttpService with ActorLogging {
         case Some(a) =>
           if (a.contains(to))
             isFriend = true
-          else
-            println("getTimeline: not a friend")
-        case None =>
-          println("getTimeline: " + from + " does not have any friends")
       }
 
       if (isFriend) {
@@ -313,15 +300,11 @@ trait RestApi extends HttpService with ActorLogging {
                   || y.from.equalsIgnoreCase(from))
                 requestedPostList = requestedPostList :+ y
             )
-            println(requestedPostList)
-          case None =>
-            println("getTimeline: " + to + " has no posts")
         }
       }
       else {
         allUserPostsMap.get(to) match {
           case Some(x) =>
-            //          println("x: " + x)
             x.foreach(
               y => if (
                 y.privacy.equalsIgnoreCase("public")
@@ -329,21 +312,15 @@ trait RestApi extends HttpService with ActorLogging {
                   || y.from.equalsIgnoreCase(from))
                 requestedPostList = requestedPostList :+ y
             )
-            println(requestedPostList)
-          case None =>
-            println("getTimeline: " + to + " has no posts")
         }
       }
     }
-    println("========================================")
-
     requestedPostList
   }
 
   private def getPictures(from: String, to: String): List[Picture]
   = {
 
-    println("in server getPictures: 1")
     var requestedPictureList: List[Picture] = List[Picture]()
     var isFriend: Boolean = false
 
@@ -352,11 +329,6 @@ trait RestApi extends HttpService with ActorLogging {
       case Some(a) =>
         if (a.contains(to))
           isFriend = true
-        else
-          println("in server:getPictures: not a friend")
-      case None =>
-        println("in server:getPictures: allUserFriendMap.get(from) did not " +
-          "return anything")
     }
 
     if (isFriend) {
@@ -369,8 +341,6 @@ trait RestApi extends HttpService with ActorLogging {
             )
               requestedPictureList = requestedPictureList :+ y
           )
-        case None =>
-          println("in server:getPictures: No pictures whatsoever")
       }
     }
     else {
@@ -382,19 +352,14 @@ trait RestApi extends HttpService with ActorLogging {
             )
               requestedPictureList = requestedPictureList :+ y
           )
-        case None =>
-          println("in server:getPictures: No pictures whatsoever")
       }
     }
-    println("requestedPictureList: " + requestedPictureList)
-
     requestedPictureList
   }
 
   private def getAlbum(owner: String, requestedby: String, albumID: String): List[Picture]
   = {
 
-    println("in server getAlbum: 1")
     var requestedAlbumList: List[Picture] = List[Picture]()
     var isFriend: Boolean = false
 
@@ -402,11 +367,6 @@ trait RestApi extends HttpService with ActorLogging {
       case Some(a) =>
         if (a.contains(requestedby))
           isFriend = true
-        else
-          println("in server:getAlbum: not a friend")
-      case None =>
-        println("in server:getAlbum: allUserFriendMap.get(owner) did not " +
-          "return anything")
     }
 
     if (isFriend) {
@@ -420,8 +380,6 @@ trait RestApi extends HttpService with ActorLogging {
             )
               requestedAlbumList = requestedAlbumList :+ y
           )
-        case None =>
-          println("in server:getTimeline: No albums whatsoever")
       }
     }
     else {
@@ -434,11 +392,8 @@ trait RestApi extends HttpService with ActorLogging {
             )
               requestedAlbumList = requestedAlbumList :+ y
           )
-        case None =>
-          println("in server:getTimeline: No albums whatsoever")
       }
     }
-
     requestedAlbumList
   }
 
@@ -452,8 +407,9 @@ trait RestApi extends HttpService with ActorLogging {
     allUserFriendMap.get(friendRequest.from) match {
       case Some(x) =>
         if (!x.contains(friendRequest.to)) {
-        val y = friendRequest.to :: x
-        allUserFriendMap = allUserFriendMap + (friendRequest.from -> y)}
+          val y = friendRequest.to :: x
+          allUserFriendMap = allUserFriendMap + (friendRequest.from -> y)
+        }
       case None =>
         val y = List(friendRequest.to)
         allUserFriendMap = allUserFriendMap + (friendRequest.from -> y)
@@ -462,27 +418,21 @@ trait RestApi extends HttpService with ActorLogging {
     allUserFriendMap.get(friendRequest.to) match {
       case Some(x) =>
         if (!x.contains(friendRequest.from)) {
-        val y = friendRequest.from :: x
-        allUserFriendMap = allUserFriendMap + (friendRequest.to -> y)}
+          val y = friendRequest.from :: x
+          allUserFriendMap = allUserFriendMap + (friendRequest.to -> y)
+        }
       case None =>
         val y = List(friendRequest.from)
         allUserFriendMap = allUserFriendMap + (friendRequest.to -> y)
     }
-
-//    getUserID(friendRequest.from).get.friendList + friendRequest.to
-//
-//    getUserID(friendRequest.to).get.friendList + friendRequest.from
-
   }
 
   private def getFriends(id: String): List[String] = {
 
-    println("i am in server:getFriends; id: " + id)
     allUserFriendMap.get(id) match {
       case Some(x) =>
         x
     }
-    //    getUserID(id).map(toFriend)
   }
 }
 
@@ -529,12 +479,10 @@ class Responder(requestContext: RequestContext) extends Actor with ActorLogging 
       killYourself
 
     case AlbumResponse1 =>
-      println("in server case album/picture")
       requestContext.complete(StatusCodes.OK)
       killYourself
 
     case friends: String =>
-      println("in server: case friends line 526")
       requestContext.complete(friends)
       killYourself
 

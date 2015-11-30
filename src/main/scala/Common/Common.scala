@@ -117,9 +117,6 @@ object Common {
   implicit def toTimeline(user: User): TimeLine = TimeLine(username =
     user.username, postList = user.postList)
 
-//  implicit def toPost(post: Post): Post = Post(date = post.date, from =
-//    post.from, to = post.to, privacy = post.privacy, content = post.content)
-
   implicit def toPosts(post_List: List[Post]): List[Post] = post_List
 
   implicit def toFriend(user: User): Friend = Friend(username =
@@ -128,8 +125,4 @@ object Common {
   implicit def toFriends(friend_List: List[String]): List[String] = friend_List
 
   implicit def toUsersName(user: User): String = user.username
-
-  //implicit def toPictures(pictureList : PictureList): PictureList = pictureList
-
-  //implicit def toAlbum(album: Album): Album = Album(requestor = album.requestor,responseList=album.responseList )
 }
