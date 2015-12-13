@@ -1,6 +1,9 @@
 package Client
 
 import java.util
+import java.security._
+import javax.crypto.Cipher
+import javax.crypto.spec.{SecretKeySpec, IvParameterSpec}
 
 import Common.Common._
 import akka.actor.{Actor, ActorSystem, PoisonPill, Props}
@@ -8,6 +11,7 @@ import akka.io.IO
 import akka.pattern.ask
 import akka.util.Timeout
 import com.typesafe.config.ConfigFactory
+import org.apache.commons.codec.binary.Base64
 import spray.can.Http
 import spray.http.HttpMethods._
 import spray.http._
@@ -30,6 +34,9 @@ object Client {
   privacyList.put(0, "friends")
   privacyList.put(1, "public")
   privacyList.put(2, "private")
+
+  var publicKeys: Map[String, PublicKey] = new scala.collection.immutable
+  .HashMap[String, PublicKey]
 
   def main(args: Array[String]): Unit = {
 
@@ -56,6 +63,7 @@ object Client {
     val serverPort = args(1)
     val numOfUsers = args(2).toInt
 
+
     implicit var system = ActorSystem("FBClient", ConfigFactory.load
     (configFactory))
 
@@ -64,26 +72,49 @@ object Client {
     for (i <- 0 to numOfUsers - 2) {
       userIDList.add("user" + i)
 
+      val keyPairGenerator:KeyPairGenerator = KeyPairGenerator.getInstance("RSA");
+      keyPairGenerator.initialize(2048)
+      val keyPair:KeyPair = keyPairGenerator.genKeyPair()
+      val publicKeyBytes = keyPair.getPublic
+      publicKeys += "user"+i -> publicKeyBytes
+      val privateKeyBytes = keyPair.getPrivate
+
       val client = system.actorOf(Props(new FBUser("user" + i, "name" + i,
-        "about" + i, serverIP, serverPort, system)), i.toString)
+        "about" + i, privateKeyBytes, serverIP, serverPort, system)), i
+        .toString)
       Thread.sleep(10)
+
       client ! CreateUser
 
-      system.scheduler.scheduleOnce(10000 millis, client, Schedule
-      ("user" + Random.nextInt(userIDList.size())))
+//      system.scheduler.scheduleOnce(10000 millis, client, Schedule
+//      ("user" + Random.nextInt(userIDList.size())))
+
+//      client ! PrintKeys
     }
 
+    val keyPairGenerator:KeyPairGenerator = KeyPairGenerator.getInstance("RSA");
+    keyPairGenerator.initialize(2048)
+    val keyPair:KeyPair = keyPairGenerator.genKeyPair()
+    val publicKeyBytes = keyPair.getPublic
+    publicKeys += "user"+numOfUsers -> publicKeyBytes
+    val privateKeyBytes = keyPair.getPrivate
+
     val client = system.actorOf(Props(new FBUser("user" + numOfUsers, "name" + numOfUsers,
-      "about" + numOfUsers, serverIP, serverPort, system)), numOfUsers.toString)
+      "about" + numOfUsers, privateKeyBytes, serverIP, serverPort, system)),
+      numOfUsers
+      .toString)
     client ! CreateUser
-    system.scheduler.scheduleOnce(10000 millis, client, Schedule1
-    ("user" + Random.nextInt(userIDList.size()), b))
+//    system.scheduler.scheduleOnce(10000 millis, client, Schedule1
+//    ("user" + Random.nextInt(userIDList.size()), b))
+
+//    client ! PrintKeys
   }
 
   class FBUser(
                 userID: String,
                 name: String,
                 aboutMe: String,
+                privateKey:PrivateKey,
                 serverIP: String,
                 serverPort: String,
                 system: ActorSystem
@@ -96,8 +127,58 @@ object Client {
     .HashMap[String, Post]
     var friendList: Set[String] = new scala.collection.immutable
     .HashSet[String]
+    val privateKeyActor:PrivateKey = privateKey
+
+    def hex_Digest(s: String): String = {
+      val sha = MessageDigest.getInstance("SHA-256")
+      sha.digest(s.getBytes).foldLeft("")((s: String, b: Byte) =>
+        s + Character.forDigit((b & 0xf0) >> 4, 16) + Character.forDigit(b & 0x0f, 16))
+    }
+
+    def getSecureRandom:String =
+    {
+      val random:SecureRandom = SecureRandom.getInstance("SHA1PRNG")
+      val value = random.nextInt()
+      println("value: "+value)
+
+      val shaoutput = hex_Digest(value.toString)
+      println("shaoutput: "+shaoutput)
+      shaoutput.substring(0,16)
+    }
+
+    def encryptAES(key:String, initVector:String, value:String):String =
+    {
+      val iv:IvParameterSpec = new IvParameterSpec(initVector.getBytes("UTF-8"))
+      val skeySpec:SecretKeySpec = new SecretKeySpec(key.getBytes("UTF-8"), "AES")
+
+      val cipher:Cipher = Cipher.getInstance("AES/CBC/PKCS5PADDING")
+      cipher.init(Cipher.ENCRYPT_MODE, skeySpec, iv)
+
+      val encrypted:Array[Byte] = cipher.doFinal(value.getBytes())
+
+      Base64.encodeBase64String(encrypted)
+    }
+
+    def decryptAES(key:String, initVector:String, encrypted:String):String =
+    {
+      val iv:IvParameterSpec = new IvParameterSpec(initVector.getBytes("UTF-8"))
+      val skeySpec:SecretKeySpec = new SecretKeySpec(key.getBytes("UTF-8"), "AES")
+
+      val cipher:Cipher = Cipher.getInstance("AES/CBC/PKCS5PADDING")
+      cipher.init(Cipher.DECRYPT_MODE, skeySpec, iv)
+
+      val decrypted:Array[Byte] = cipher.doFinal(Base64.decodeBase64
+      (encrypted))
+
+      new String(decrypted)
+    }
 
     def receive: Receive = {
+
+      case PrintKeys =>
+        println("private key: "+privateKeyActor)
+        println("public key: "+publicKeys.get(id))
+
 
       case Schedule(id1: String) =>
 
@@ -148,6 +229,13 @@ object Client {
           serverIP + ":" + serverPort + "/user")).withEntity(HttpEntity(ContentType(MediaTypes.`application/json`), userJSON.toString()))).mapTo[HttpResponse]
         val response = Await.result(future, timeout.duration)
         println("response: CreateUser: " + response)
+
+        val key = getSecureRandom
+//        val key = "Bar12345Bar12345"
+        val encryptedString = encryptAES(key, "RandomInitVector","Hi I am " +
+          "Priti")
+        println("encryptedString: "+encryptedString)
+        println("decryptedString: "+decryptAES(key,"RandomInitVector", encryptedString))
 
       case GetProfile(id: String) =>
 
@@ -239,6 +327,8 @@ object Client {
   }
 
 }
+
+case class PrintKeys()
 
 case class Schedule(id: String)
 
