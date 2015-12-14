@@ -1,5 +1,7 @@
 package Common
 
+import java.security.PublicKey
+
 import spray.json._
 
 /**
@@ -11,6 +13,7 @@ object Common {
                    id: String,
                    username: String,
                    about: String,
+                   publicKey: String,
                    postList: scala.collection.immutable.Map[String, Post],
                    friendList: scala.collection.immutable.Set[String]
                  )
@@ -89,8 +92,9 @@ object Common {
 
   object User extends DefaultJsonProtocol {
 
-    implicit val format = jsonFormat5(User.apply)
+    implicit val format = jsonFormat6(User.apply)
   }
+
 
   object Profile extends DefaultJsonProtocol {
 
@@ -108,6 +112,7 @@ object Common {
     id = user.id,
     username = user.username,
     about = user.about,
+  publicKey = user.publicKey,
     postList = user.postList,
     friendList = user.friendList)
 
@@ -125,4 +130,6 @@ object Common {
   implicit def toFriends(friend_List: List[String]): List[String] = friend_List
 
   implicit def toUsersName(user: User): String = user.username
+
+  implicit def toPublicKey(publicKey: PublicKey): PublicKey = publicKey
 }

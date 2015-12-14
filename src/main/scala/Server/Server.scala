@@ -1,5 +1,7 @@
 package Server
 
+import java.security.PublicKey
+
 import akka.actor._
 import akka.io.IO
 import akka.pattern.ask
@@ -101,6 +103,9 @@ trait RestApi extends HttpService with ActorLogging {
 
   var allUserPicturesMap: Map[String, List[Picture]] = new scala.collection.immutable.HashMap[String, List[Picture]]
 
+  var publicKeys: Map[String, String] = new scala.collection.immutable
+  .HashMap[String, String]
+
   def routes: Route =
 
     pathPrefix("user") {
@@ -176,6 +181,14 @@ trait RestApi extends HttpService with ActorLogging {
           }
         }
       } ~
+      pathPrefix("getpublickey") {
+        path(Segment) { id =>
+          get { requestContext =>
+            val responder = createResponder(requestContext)
+            responder ! getPublicKey(id).toString()
+          }
+        }
+      } ~
       pathPrefix("picture") {
         pathEnd {
           post {
@@ -210,6 +223,7 @@ trait RestApi extends HttpService with ActorLogging {
     val doesNotExist = !users.exists(_.id == user.id)
     if (doesNotExist) {
       users = users :+ user
+      publicKeys += user.id -> user.publicKey
     }
     doesNotExist
   }
@@ -458,6 +472,16 @@ trait RestApi extends HttpService with ActorLogging {
       case None =>
         val l: List[String] = List[String]()
         l
+    }
+  }
+
+  private def getPublicKey(id:String):String = {
+    publicKeys.get(id) match {
+      case Some(x) =>
+        x
+//      case None =>
+//        _
+//        println("Did not find publicKey for: "+id)
     }
   }
 }
