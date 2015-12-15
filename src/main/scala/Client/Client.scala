@@ -1,15 +1,14 @@
 package Client
 
 import java.security._
-import java.security.spec.{X509EncodedKeySpec, PKCS8EncodedKeySpec}
 import java.util
 import javax.crypto.Cipher
 import javax.crypto.spec.{IvParameterSpec, SecretKeySpec}
 
 import Common.Common._
-import akka.actor.{Actor, ActorSystem, PoisonPill, Props}
+import akka.actor._
 import akka.io.IO
-import akka.pattern.ask
+import akka.pattern.{AskableActorSelection, ask}
 import akka.util.Timeout
 import com.typesafe.config.ConfigFactory
 import org.apache.commons.codec.binary.Base64
@@ -35,8 +34,8 @@ object Client {
   privacyList.put(1, "public")
   privacyList.put(2, "private")
 
-//  var publicKeys: Map[String, PublicKey] = new scala.collection.immutable
-//  .HashMap[String, PublicKey]
+  var publicKeys: Map[String, PublicKey] = new scala.collection.immutable
+  .HashMap[String, PublicKey]
 
   def main(args: Array[String]): Unit = {
 
@@ -76,13 +75,12 @@ object Client {
       keyPairGenerator.initialize(2048)
       val keyPair: KeyPair = keyPairGenerator.genKeyPair()
       val publicKeyBytes = keyPair.getPublic
-//      publicKeys += "user" + i -> publicKeyBytes
+      publicKeys += "user" + i -> publicKeyBytes
       val privateKeyBytes = keyPair.getPrivate
 
       val client = system.actorOf(Props(new FBUser("user" + i, "name" + i,
         "about" + i, publicKeyBytes, privateKeyBytes, serverIP, serverPort,
-        system)), i
-        .toString)
+        system)), i.toString)
       Thread.sleep(10)
 
       client ! CreateUser
@@ -97,11 +95,11 @@ object Client {
     keyPairGenerator.initialize(2048)
     val keyPair: KeyPair = keyPairGenerator.genKeyPair()
     val publicKeyBytes = keyPair.getPublic
-//    publicKeys += "user" + numOfUsers -> publicKeyBytes
+    publicKeys += "user" + numOfUsers -> publicKeyBytes
     val privateKeyBytes = keyPair.getPrivate
 
     val client = system.actorOf(Props(new FBUser("user" + numOfUsers, "name" + numOfUsers,
-      "about" + numOfUsers,publicKeyBytes, privateKeyBytes, serverIP,
+      "about" + numOfUsers, publicKeyBytes, privateKeyBytes, serverIP,
       serverPort, system)),
       numOfUsers
         .toString)
@@ -178,30 +176,63 @@ object Client {
       new String(decrypted)
     }
 
-//    def getPublicKey (id1:String): PublicKey =>
-//    {
+    def getPublicKey(id1: String): PublicKey = {
+
+      //      implicit val timeout = Timeout(10 seconds)
+      //
+      //      system.actorSelection("/user/" + id1).resolveOne().onComplete {
+      //        case Success(actor) =>
+      //          actor ! GetPublicKey
+      ////          val future2 = ask(actor, GetPublicKey).mapTo[PublicKey]
+      ////          val result2 = Await.result(future2, 10 second)
+      ////          println("result from def method: " + result2)
+      ////          result2
+      //
+      //      }
+
+      implicit val resolveTimeout = Timeout(5 seconds)
+      val actorRef = Await.result(system.actorSelection("user/0").resolveOne(),10 second)
+
+//      val sel: ActorSelection = context.system.actorSelection("user/" + id1);
 //
-//    }
+//      //      val t: Timeout = new Timeout(5, TimeUnit.SECONDS)
+//      implicit val timeout = Timeout(10 seconds)
+//      val asker: AskableActorSelection = new AskableActorSelection(sel);
+//      val fut = asker.ask(new Identify(1), 10 second)
+//      val ident = Await.result(fut, 10 second)
+//      val ref: ActorRef = ident.asInstanceOf[ActorIdentity].getRef
+
+      val future2 = ask(actorRef, GetPublicKey).mapTo[PublicKey]
+      val result2 = Await.result(future2, 10 second)
+      println("result from def method: " + result2)
+      result2
+    }
 
     def receive: Receive = {
 
-      case GetPublicKey(id1:String) =>
+      case GetPublicKey =>
 
-        implicit val timeout = Timeout(10 seconds)
+        //        implicit val timeout = Timeout(10 seconds)
+        //        println("inside getpk 1")
+        //        val future = IO(Http)(system).ask(HttpRequest(GET, Uri(s"http://" +
+        //          serverIP + ":" + serverPort + "/getpublickey/" + id1)))
+        //          .mapTo[HttpResponse]
+        //        println("inside getpk 2")
+        //        val response = Await.result(future, timeout.duration)
+        ////        println("response: GetPublicKey: " + response.entity.asString)
+        //        println("inside getpk 3")
+        ////        val pubBytes:Array[Byte] = Base64.decodeBase64(response.entity.asString)
+        ////        val kf:KeyFactory  = KeyFactory.getInstance("RSA")
+        ////        val publicKey:PublicKey  = kf.generatePublic(new X509EncodedKeySpec
+        ////        (pubBytes))
+        ////        println(id+"'s Recovered Public Key: \n" + pub_recovered.toString());
+        //        println("inside getpk 4")
+        //        sender ! "response.entity.asString"
+        //        println("inside getpk 5")
 
-        val future = IO(Http)(system).ask(HttpRequest(GET, Uri(s"http://" +
-          serverIP + ":" + serverPort + "/getpublickey/" + id1)))
-          .mapTo[HttpResponse]
-
-        val response = Await.result(future, timeout.duration)
-//        println("response: GetPublicKey: " + response.entity.asString)
-
-        val pubBytes:Array[Byte] = Base64.decodeBase64(response.entity.asString)
-        val kf:KeyFactory  = KeyFactory.getInstance("RSA")
-        val publicKey:PublicKey  = kf.generatePublic(new X509EncodedKeySpec
-        (pubBytes))
-//        println(id+"'s Recovered Public Key: \n" + pub_recovered.toString());
-
+        val response11 = publicKey
+        sender ! response11
+      //        sender ! publicKey
 
       case Schedule(id1: String) =>
 
@@ -247,26 +278,52 @@ object Client {
       case CreateUser =>
 
         implicit val timeout = Timeout(10 seconds)
-        println(id+"'s Original public key is: "+publicKey.toString)
-//        println("something: "+javax.xml.bind.DatatypeConverter.printHexBinary
-//        (publicKey.getEncoded))
+        //        println(id + "'s Original public key is: " + publicKey.toString)
+        //        println("something: "+javax.xml.bind.DatatypeConverter.printHexBinary
+        //        (publicKey.getEncoded))
 
-        val base64String:String = Base64.encodeBase64String(publicKey.getEncoded)
-        val userJSON = new User(id, username, about, base64String, postList, friendList).toJson
+        val key = getSecureRandom
+        val encryptedUsername = encryptAES(key, "RandomInitVector", username)
+        val encryptedAbout = encryptAES(key, "RandomInitVector", about)
+        val base64String: String = Base64.encodeBase64String(publicKey.getEncoded)
+        val userJSON = new User(id, encryptedUsername, encryptedAbout, base64String, postList, friendList).toJson
 
         val future = IO(Http)(system).ask(HttpRequest(POST, Uri(s"http://" +
           serverIP + ":" + serverPort + "/user")).withEntity(HttpEntity(ContentType(MediaTypes.`application/json`), userJSON.toString()))).mapTo[HttpResponse]
+
         val response = Await.result(future, timeout.duration)
         println("response: CreateUser: " + response.entity.asString)
 
-// //       val key = getSecureRandom
-//        //    //    val key = "Bar12345Bar12345"
-//  //      val key1 = getSecureRandom
-//        val encryptedString = encryptAES(key, //"RandomInitVector",// "Hi I am " +
-//          "Priti")
-//        println("encry//ptedString: " + encryptedString)
-//        println("decryptedString: " + decr//yptAES(key1, "RandomInitVector",
-//          encryptedString))
+        println("my path is: "+self.path)
+        println("inside create user, result " + getPublicKey("0").toString)
+
+      // //       val key = getSecureRandom
+      //  //      val key1 = getSecureRandom
+      //        val encryptedString = encryptAES(key, "RandomInitVector", "Hi I am " +
+      //          "Priti")
+      //        println("encryptedString: " + encryptedString)
+      //        println("decryptedString: " + decryptAES(key1, "RandomInitVector",
+      //          encryptedString))
+
+      //        implicit val timeout1 = Timeout(10 seconds)
+      //        val result1 = system.actorSelection("/user/user0") ! "GetPublicKey"
+      //        //        val result1 = Await.result(future1, timeout.duration)
+      //
+      //        Thread.sleep(12000)
+      //        println("result1: " + result1)
+
+      //              val future2: Future[String] = ask(self, GetPublicKey)
+      //                .mapTo[String]
+      //              val result2 = Await.result(future2, 1 second)
+      //              println("result1: " + result2)
+
+      //        val pubBytes:Array[Byte] = Base64.decodeBase64(result1)
+      //        val kf:KeyFactory  = KeyFactory.getInstance("RSA")
+      //        val publicKey1:PublicKey  = kf.generatePublic(new X509EncodedKeySpec
+      //        (pubBytes))
+      //        println(id + "'s Recovered Public Key: \n" + result1.toString)
+
+      //        println(id+"'s Recovered public key is: "+ result1)
 
       case GetProfile(id: String) =>
 
@@ -288,8 +345,8 @@ object Client {
       case PostMessage(friendID: String, content: String,
       privacy: String) =>
 
-        val postJSON = new Post(System.currentTimeMillis().toString, id, friendID, privacy, content)
-          .toJson
+        val postJSON = new Post(System.currentTimeMillis().toString, id, friendID, privacy, content).toJson
+
         implicit val timeout = Timeout(10 seconds)
         val future = IO(Http)(system).ask(HttpRequest(POST, Uri(s"http://" +
           serverIP + ":" + serverPort + "/post")).withEntity(HttpEntity(ContentType(MediaTypes.`application/json`), postJSON.toString()))).mapTo[HttpResponse]
@@ -359,7 +416,7 @@ object Client {
 
 }
 
-case class GetPublicKey(id1:String)
+case class GetPublicKey()
 
 case class Schedule(id: String)
 

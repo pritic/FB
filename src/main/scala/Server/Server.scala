@@ -46,7 +46,7 @@ object Server {
       }
     }
     http {
-      host = "192.168.1.41"
+      host = "127.0.0.1"
       host = ${?HOST}
       port = 5000
       port = ${?PORT}
