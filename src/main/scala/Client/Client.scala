@@ -1,6 +1,7 @@
 package Client
 
 import java.security._
+import java.security.spec.{X509EncodedKeySpec, PKCS8EncodedKeySpec}
 import java.util
 import javax.crypto.Cipher
 import javax.crypto.spec.{IvParameterSpec, SecretKeySpec}
@@ -177,19 +178,29 @@ object Client {
       new String(decrypted)
     }
 
+//    def getPublicKey (id1:String): PublicKey =>
+//    {
+//
+//    }
+
     def receive: Receive = {
 
-      case PrintKeys =>
-        println("private key: " + privateKey)
+      case GetPublicKey(id1:String) =>
 
         implicit val timeout = Timeout(10 seconds)
 
         val future = IO(Http)(system).ask(HttpRequest(GET, Uri(s"http://" +
-          serverIP + ":" + serverPort + "/getpublickey/" + id)))
+          serverIP + ":" + serverPort + "/getpublickey/" + id1)))
+          .mapTo[HttpResponse]
 
         val response = Await.result(future, timeout.duration)
-        println("response: GetPublicKey: " + response)
+//        println("response: GetPublicKey: " + response.entity.asString)
 
+        val pubBytes:Array[Byte] = Base64.decodeBase64(response.entity.asString)
+        val kf:KeyFactory  = KeyFactory.getInstance("RSA")
+        val publicKey:PublicKey  = kf.generatePublic(new X509EncodedKeySpec
+        (pubBytes))
+//        println(id+"'s Recovered Public Key: \n" + pub_recovered.toString());
 
 
       case Schedule(id1: String) =>
@@ -236,13 +247,17 @@ object Client {
       case CreateUser =>
 
         implicit val timeout = Timeout(10 seconds)
-        val userJSON = new User(id, username, about, new String(publicKey
-        .getEncoded), postList,
-          friendList).toJson
+        println(id+"'s Original public key is: "+publicKey.toString)
+//        println("something: "+javax.xml.bind.DatatypeConverter.printHexBinary
+//        (publicKey.getEncoded))
+
+        val base64String:String = Base64.encodeBase64String(publicKey.getEncoded)
+        val userJSON = new User(id, username, about, base64String, postList, friendList).toJson
+
         val future = IO(Http)(system).ask(HttpRequest(POST, Uri(s"http://" +
           serverIP + ":" + serverPort + "/user")).withEntity(HttpEntity(ContentType(MediaTypes.`application/json`), userJSON.toString()))).mapTo[HttpResponse]
         val response = Await.result(future, timeout.duration)
-        println("response: CreateUser: " + response.message.message)
+        println("response: CreateUser: " + response.entity.asString)
 
 // //       val key = getSecureRandom
 //        //    //    val key = "Bar12345Bar12345"
@@ -252,8 +267,6 @@ object Client {
 //        println("encry//ptedString: " + encryptedString)
 //        println("decryptedString: " + decr//yptAES(key1, "RandomInitVector",
 //          encryptedString))
-
-        self ! PrintKeys
 
       case GetProfile(id: String) =>
 
@@ -346,7 +359,7 @@ object Client {
 
 }
 
-case class PrintKeys()
+case class GetPublicKey(id1:String)
 
 case class Schedule(id: String)
 

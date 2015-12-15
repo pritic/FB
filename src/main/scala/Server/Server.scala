@@ -478,6 +478,7 @@ trait RestApi extends HttpService with ActorLogging {
   private def getPublicKey(id:String):String = {
     publicKeys.get(id) match {
       case Some(x) =>
+        println(x)
         x
 //      case None =>
 //        _
