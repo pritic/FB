@@ -1,7 +1,5 @@
 package Server
 
-import java.security.PublicKey
-
 import akka.actor._
 import akka.io.IO
 import akka.pattern.ask
@@ -239,13 +237,15 @@ trait RestApi extends HttpService with ActorLogging {
         allUserPostsMap = allUserPostsMap + (post.from -> y)
     }
 
-    allUserPostsMap.get(post.to) match {
-      case Some(x) =>
-        val y = post :: x
-        allUserPostsMap = allUserPostsMap + (post.to -> y)
-      case None =>
-        val y = List(post)
-        allUserPostsMap = allUserPostsMap + (post.to -> y)
+    if (!post.from.equalsIgnoreCase(post.to)) {
+      allUserPostsMap.get(post.to) match {
+        case Some(x) =>
+          val y = post :: x
+          allUserPostsMap = allUserPostsMap + (post.to -> y)
+        case None =>
+          val y = List(post)
+          allUserPostsMap = allUserPostsMap + (post.to -> y)
+      }
     }
   }
 
@@ -475,14 +475,15 @@ trait RestApi extends HttpService with ActorLogging {
     }
   }
 
-  private def getPublicKey(id:String):String = {
+  private def getPublicKey(id: String): String = {
+
     publicKeys.get(id) match {
       case Some(x) =>
         println(x)
         x
-//      case None =>
-//        _
-//        println("Did not find publicKey for: "+id)
+      //      case None =>
+      //        _
+      //        println("Did not find publicKey for: "+id)
     }
   }
 }

@@ -110,11 +110,13 @@ object Client {
 
     //    client ! PrintKeys
 
-    Thread.sleep(10000)
+    Thread.sleep(1000)
     implicit val resolveTimeout = Timeout(10 seconds)
     val actorRef = Await.result(system.actorSelection("/user/0")
       .resolveOne(), 10 second)
 
+    actorRef ! PostMessage("user0", "Hello there","private")
+    Thread.sleep(10)
     actorRef ! GetMyPosts
     //    val future2 = ask(actorRef, GetMyPosts)
     //    Await.result(future2, 10 second)
@@ -409,16 +411,38 @@ object Client {
         val i: Int = responseList.length()
 
         for (x <- 0 until i) {
-          val encryptedKey = getAESKey(id.substring(4), responseList.getJSONObject
-          (x).getString("from").substring(4), responseList.getJSONObject
-          (x).getString("date"))
 
-          val decryptedKey = decryptRSAPrivate(privateKey, encryptedKey)
-          println("Post:\n" + "From: " + responseList.getJSONObject
-          (x).getString("from") + "\nTo: " + responseList
-            .getJSONObject
-          (x).getString("to") + "\nDate: " + responseList.getJSONObject
-          (x).getString("date") + "\nContent: " + decryptAES(decryptedKey, "RandomInitVector", responseList.getJSONObject(x).getString("content")))
+          if (responseList.getJSONObject
+          (x).getString("from").equalsIgnoreCase(responseList.getJSONObject
+          (x).getString("to")))
+            {
+              var encryptedKey:String = ""
+              postAESKeyMap.get(responseList.getJSONObject
+              (x).getString("date")) match {
+                case Some(x) =>
+                  encryptedKey = x
+              }
+              val decryptedKey = decryptRSAPrivate(privateKey, encryptedKey)
+
+              println("Post:\n" + "From: " + responseList.getJSONObject
+              (x).getString("from") + "\nTo: " + responseList
+                .getJSONObject
+                (x).getString("to") + "\nDate: " + responseList.getJSONObject
+              (x).getString("date") + "\nContent: " + decryptAES(decryptedKey, "RandomInitVector", responseList.getJSONObject(x).getString("content")))
+            }
+
+          else {
+            val encryptedKey = getAESKey(id.substring(4), responseList.getJSONObject
+            (x).getString("from").substring(4), responseList.getJSONObject
+            (x).getString("date"))
+
+            val decryptedKey = decryptRSAPrivate(privateKey, encryptedKey)
+            println("Post:\n" + "From: " + responseList.getJSONObject
+            (x).getString("from") + "\nTo: " + responseList
+              .getJSONObject
+              (x).getString("to") + "\nDate: " + responseList.getJSONObject
+            (x).getString("date") + "\nContent: " + decryptAES(decryptedKey, "RandomInitVector", responseList.getJSONObject(x).getString("content")))
+          }
         }
 
       case MakeFriend(id1: String) =>
