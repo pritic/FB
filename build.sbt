@@ -26,4 +26,6 @@ libraryDependencies ++= {
 }
 
 libraryDependencies += "commons-codec" % "commons-codec" % "1.9"
+libraryDependencies += "org.json" % "json" % "20151123"
+
 

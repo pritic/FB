@@ -8,10 +8,11 @@ import javax.crypto.spec.{IvParameterSpec, SecretKeySpec}
 import Common.Common._
 import akka.actor._
 import akka.io.IO
-import akka.pattern.{AskableActorSelection, ask}
+import akka.pattern.ask
 import akka.util.Timeout
 import com.typesafe.config.ConfigFactory
 import org.apache.commons.codec.binary.Base64
+import org.json.{JSONArray, JSONObject}
 import spray.can.Http
 import spray.http.HttpMethods._
 import spray.http._
@@ -108,6 +109,15 @@ object Client {
     //    ("user" + Random.nextInt(userIDList.size()), b))
 
     //    client ! PrintKeys
+
+    Thread.sleep(10000)
+    implicit val resolveTimeout = Timeout(10 seconds)
+    val actorRef = Await.result(system.actorSelection("/user/0")
+      .resolveOne(), 10 second)
+
+    actorRef ! GetMyPosts
+    //    val future2 = ask(actorRef, GetMyPosts)
+    //    Await.result(future2, 10 second)
   }
 
   class FBUser(
@@ -130,6 +140,9 @@ object Client {
     .HashSet[String]
     val privateKey: PrivateKey = privateKey1
     val publicKey: PublicKey = publicKey1
+    var profileKey: String = null
+    var postAESKeyMap: Map[String, String] = new scala.collection.immutable
+    .HashMap[String, String]
 
     def hex_Digest(s: String): String = {
 
@@ -142,10 +155,7 @@ object Client {
 
       val random: SecureRandom = SecureRandom.getInstance("SHA1PRNG")
       val value = random.nextInt()
-      println("value: " + value)
-
       val shaoutput = hex_Digest(value.toString)
-      println("shaoutput: " + shaoutput)
       shaoutput.substring(0, 16)
     }
 
@@ -176,63 +186,97 @@ object Client {
       new String(decrypted)
     }
 
+    def encryptRSAPublic(key: PublicKey, value: String): String = {
+
+      val cipher: Cipher = Cipher.getInstance("RSA/ECB/PKCS1PADDING")
+      // encrypt the plain text using the public key
+      cipher.init(Cipher.ENCRYPT_MODE, key)
+      val encrypted: Array[Byte] = cipher.doFinal(value.getBytes())
+
+      Base64.encodeBase64String(encrypted)
+    }
+
+    def decryptRSAPrivate(key: PrivateKey, encrypted: String): String = {
+
+      val cipher: Cipher = Cipher.getInstance("RSA/ECB/PKCS1PADDING")
+
+      // decrypt the text using the private key
+      cipher.init(Cipher.DECRYPT_MODE, key)
+      val decrypted: Array[Byte] = cipher.doFinal(Base64.decodeBase64
+      (encrypted))
+
+      new String(decrypted)
+    }
+
     def getPublicKey(id1: String): PublicKey = {
 
-      //      implicit val timeout = Timeout(10 seconds)
-      //
-      //      system.actorSelection("/user/" + id1).resolveOne().onComplete {
-      //        case Success(actor) =>
-      //          actor ! GetPublicKey
-      ////          val future2 = ask(actor, GetPublicKey).mapTo[PublicKey]
-      ////          val result2 = Await.result(future2, 10 second)
-      ////          println("result from def method: " + result2)
-      ////          result2
-      //
-      //      }
-
-      implicit val resolveTimeout = Timeout(5 seconds)
-      val actorRef = Await.result(system.actorSelection("user/0").resolveOne(),10 second)
-
-//      val sel: ActorSelection = context.system.actorSelection("user/" + id1);
-//
-//      //      val t: Timeout = new Timeout(5, TimeUnit.SECONDS)
-//      implicit val timeout = Timeout(10 seconds)
-//      val asker: AskableActorSelection = new AskableActorSelection(sel);
-//      val fut = asker.ask(new Identify(1), 10 second)
-//      val ident = Await.result(fut, 10 second)
-//      val ref: ActorRef = ident.asInstanceOf[ActorIdentity].getRef
+      implicit val resolveTimeout = Timeout(10 seconds)
+      val actorRef = Await.result(system.actorSelection("/user/" + id1)
+        .resolveOne(), 10 second)
 
       val future2 = ask(actorRef, GetPublicKey).mapTo[PublicKey]
       val result2 = Await.result(future2, 10 second)
-      println("result from def method: " + result2)
       result2
+    }
+
+    //sends AES key encrypted with requester's public key
+    def getAESKey(askerID: String, id1: String, date1: String): String = {
+
+      implicit val resolveTimeout = Timeout(10 seconds)
+      val actorRef = Await.result(system.actorSelection("/user/" + id1)
+        .resolveOne(), 10 second)
+
+      val future2 = ask(actorRef, GetAESKey(askerID, date1)).mapTo[String]
+      val result2 = Await.result(future2, 10 second)
+      result2
+
+    }
+
+    //sends AES key encrypted with the requested profile user's public key
+
+    def getProfileKey(askerID: String, id1: String): String = {
+
+      implicit val resolveTimeout = Timeout(10 seconds)
+      val actorRef = Await.result(system.actorSelection("/user/" + id1)
+        .resolveOne(), 10 second)
+
+      val future2 = ask(actorRef, GetProfileKeyAES).mapTo[String]
+      val result2 = Await.result(future2, 10 second)
+
+      var askersPublicKey: PublicKey = null
+
+      publicKeys.get(askerID) match {
+        case Some(x) =>
+          askersPublicKey = x
+      }
+
+      encryptRSAPublic(askersPublicKey, result2)
+
     }
 
     def receive: Receive = {
 
+      case GetAESKey(id1: String, date1: String) =>
+
+        var e_Pub_self_AES: String = ""
+
+        postAESKeyMap.get(date1) match {
+          case Some(x) =>
+            e_Pub_self_AES = x
+        }
+
+        var requesters_public_key: PublicKey = null
+        publicKeys.get("user"+id1) match {
+          case Some(x) =>
+            requesters_public_key = x
+        }
+        sender ! encryptRSAPublic(requesters_public_key, decryptRSAPrivate(privateKey, e_Pub_self_AES))
+
       case GetPublicKey =>
+        sender ! publicKey
 
-        //        implicit val timeout = Timeout(10 seconds)
-        //        println("inside getpk 1")
-        //        val future = IO(Http)(system).ask(HttpRequest(GET, Uri(s"http://" +
-        //          serverIP + ":" + serverPort + "/getpublickey/" + id1)))
-        //          .mapTo[HttpResponse]
-        //        println("inside getpk 2")
-        //        val response = Await.result(future, timeout.duration)
-        ////        println("response: GetPublicKey: " + response.entity.asString)
-        //        println("inside getpk 3")
-        ////        val pubBytes:Array[Byte] = Base64.decodeBase64(response.entity.asString)
-        ////        val kf:KeyFactory  = KeyFactory.getInstance("RSA")
-        ////        val publicKey:PublicKey  = kf.generatePublic(new X509EncodedKeySpec
-        ////        (pubBytes))
-        ////        println(id+"'s Recovered Public Key: \n" + pub_recovered.toString());
-        //        println("inside getpk 4")
-        //        sender ! "response.entity.asString"
-        //        println("inside getpk 5")
-
-        val response11 = publicKey
-        sender ! response11
-      //        sender ! publicKey
+      case GetProfileKeyAES =>
+        sender ! profileKey
 
       case Schedule(id1: String) =>
 
@@ -278,14 +322,13 @@ object Client {
       case CreateUser =>
 
         implicit val timeout = Timeout(10 seconds)
-        //        println(id + "'s Original public key is: " + publicKey.toString)
-        //        println("something: "+javax.xml.bind.DatatypeConverter.printHexBinary
-        //        (publicKey.getEncoded))
 
         val key = getSecureRandom
+        this.profileKey = key
         val encryptedUsername = encryptAES(key, "RandomInitVector", username)
         val encryptedAbout = encryptAES(key, "RandomInitVector", about)
         val base64String: String = Base64.encodeBase64String(publicKey.getEncoded)
+
         val userJSON = new User(id, encryptedUsername, encryptedAbout, base64String, postList, friendList).toJson
 
         val future = IO(Http)(system).ask(HttpRequest(POST, Uri(s"http://" +
@@ -294,44 +337,32 @@ object Client {
         val response = Await.result(future, timeout.duration)
         println("response: CreateUser: " + response.entity.asString)
 
-        println("my path is: "+self.path)
-        println("inside create user, result " + getPublicKey("0").toString)
+        //        if (!id.equalsIgnoreCase("user0"))
+        //          println("inside create user for " + id + " result " + getPublicKey("0")
+        //            .toString)
 
-      // //       val key = getSecureRandom
-      //  //      val key1 = getSecureRandom
-      //        val encryptedString = encryptAES(key, "RandomInitVector", "Hi I am " +
-      //          "Priti")
-      //        println("encryptedString: " + encryptedString)
-      //        println("decryptedString: " + decryptAES(key1, "RandomInitVector",
-      //          encryptedString))
+        if (!id.equalsIgnoreCase("user0")) {
+          //          self ! GetProfile("0")
+          self ! PostMessage("user0", "This is a post from " + id + "" +
+            " to user0", privacyList.get(Random.nextInt(3)))
+        }
 
-      //        implicit val timeout1 = Timeout(10 seconds)
-      //        val result1 = system.actorSelection("/user/user0") ! "GetPublicKey"
-      //        //        val result1 = Await.result(future1, timeout.duration)
-      //
-      //        Thread.sleep(12000)
-      //        println("result1: " + result1)
-
-      //              val future2: Future[String] = ask(self, GetPublicKey)
-      //                .mapTo[String]
-      //              val result2 = Await.result(future2, 1 second)
-      //              println("result1: " + result2)
-
-      //        val pubBytes:Array[Byte] = Base64.decodeBase64(result1)
-      //        val kf:KeyFactory  = KeyFactory.getInstance("RSA")
-      //        val publicKey1:PublicKey  = kf.generatePublic(new X509EncodedKeySpec
-      //        (pubBytes))
-      //        println(id + "'s Recovered Public Key: \n" + result1.toString)
-
-      //        println(id+"'s Recovered public key is: "+ result1)
-
-      case GetProfile(id: String) =>
+      case GetProfile(id1: String) =>
 
         implicit val timeout = Timeout(10 seconds)
         val future = IO(Http)(system).ask(HttpRequest(GET, Uri(s"http://" +
-          serverIP + ":" + (serverPort) + "/profile/" + id)))
+          serverIP + ":" + (serverPort) + "/profile/" + "user" + id1)))
+          .mapTo[HttpResponse]
         val response = Await.result(future, timeout.duration)
-        println("response: GetProfile: " + response)
+
+        val myObject: JSONObject = new JSONObject(response.entity.asString)
+
+        val encryptedAESKey = getProfileKey(id, id1)
+
+        val decryptedAESKey = decryptRSAPrivate(privateKey, encryptedAESKey)
+
+        println("Requested Profile is:\nName: " + decryptAES(decryptedAESKey,
+          "RandomInitVector", myObject.getString("username")) + "\nAbout: " + decryptAES(decryptedAESKey, "RandomInitVector", myObject.getString("about")))
 
       case GetTimeline(id1: String) =>
 
@@ -345,21 +376,50 @@ object Client {
       case PostMessage(friendID: String, content: String,
       privacy: String) =>
 
-        val postJSON = new Post(System.currentTimeMillis().toString, id, friendID, privacy, content).toJson
+        val key = getSecureRandom
+        val encryptedContent = encryptAES(key, "RandomInitVector", content)
+        val date1 = System.currentTimeMillis().toString
+        postAESKeyMap += (date1 -> encryptRSAPublic(publicKey, key))
+
+        val postJSON = new Post(date1, id, friendID, privacy, encryptedContent)
+          .toJson
 
         implicit val timeout = Timeout(10 seconds)
         val future = IO(Http)(system).ask(HttpRequest(POST, Uri(s"http://" +
           serverIP + ":" + serverPort + "/post")).withEntity(HttpEntity(ContentType(MediaTypes.`application/json`), postJSON.toString()))).mapTo[HttpResponse]
+
         val response = Await.result(future, timeout.duration)
-        println("response: PostMessage: " + response)
+
+        println("response: PostMessage: " + response.entity.asString)
 
       case GetMyPosts =>
 
         implicit val timeout = Timeout(10 seconds)
         val future = IO(Http)(system).ask(HttpRequest(GET, Uri(s"http://" +
-          serverIP + ":" + serverPort + "/post/" + id)))
+          serverIP + ":" + serverPort + "/post/" + id))).mapTo[HttpResponse]
+
         val response = Await.result(future, timeout.duration)
-        println("response: GetMyPosts: " + response)
+
+//        println("response: GetMyPosts raw: " + response.entity.asString)
+
+        val responseList: JSONArray = new JSONArray(response.entity.asString)
+
+        println("List of Posts: " + responseList)
+
+        val i: Int = responseList.length()
+
+        for (x <- 0 until i) {
+          val encryptedKey = getAESKey(id.substring(4), responseList.getJSONObject
+          (x).getString("from").substring(4), responseList.getJSONObject
+          (x).getString("date"))
+
+          val decryptedKey = decryptRSAPrivate(privateKey, encryptedKey)
+          println("Post:\n" + "From: " + responseList.getJSONObject
+          (x).getString("from") + "\nTo: " + responseList
+            .getJSONObject
+          (x).getString("to") + "\nDate: " + responseList.getJSONObject
+          (x).getString("date") + "\nContent: " + decryptAES(decryptedKey, "RandomInitVector", responseList.getJSONObject(x).getString("content")))
+        }
 
       case MakeFriend(id1: String) =>
 
@@ -416,7 +476,11 @@ object Client {
 
 }
 
+case class GetAESKey(id1: String, date1: String)
+
 case class GetPublicKey()
+
+case class GetProfileKeyAES()
 
 case class Schedule(id: String)
 
