@@ -2,6 +2,7 @@ package Client
 
 import java.security._
 import java.util
+import java.util.concurrent._
 import javax.crypto.Cipher
 import javax.crypto.spec.{IvParameterSpec, SecretKeySpec}
 
@@ -19,8 +20,10 @@ import spray.http._
 import spray.httpx.unmarshalling.FormDataUnmarshallers
 import spray.json._
 
+import scala.collection.convert.decorateAsScala._
 import scala.collection.immutable._
 import scala.concurrent.Await
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.util.Random
 
@@ -29,13 +32,13 @@ import scala.util.Random
   */
 object Client {
 
-  val userIDList: util.HashSet[String] = new util.HashSet[String]()
+  val userIDList = new ConcurrentSkipListSet[String]().asScala
   val privacyList: util.HashMap[Int, String] = new util.HashMap[Int, String]()
   privacyList.put(0, "friends")
   privacyList.put(1, "public")
   privacyList.put(2, "private")
 
-  var publicKeys: Map[String, PublicKey] = new scala.collection.immutable
+  var publicKeys: scala.collection.immutable.Map[String, PublicKey] = new scala.collection.immutable
   .HashMap[String, PublicKey]
 
   def main(args: Array[String]): Unit = {
@@ -69,10 +72,10 @@ object Client {
 
     val b = System.currentTimeMillis()
 
-    for (i <- 0 to numOfUsers - 2) {
+    for (i <- 0 until numOfUsers) {
       userIDList.add("user" + i)
 
-      val keyPairGenerator: KeyPairGenerator = KeyPairGenerator.getInstance("RSA");
+      val keyPairGenerator: KeyPairGenerator = KeyPairGenerator.getInstance("RSA")
       keyPairGenerator.initialize(2048)
       val keyPair: KeyPair = keyPairGenerator.genKeyPair()
       val publicKeyBytes = keyPair.getPublic
@@ -81,45 +84,53 @@ object Client {
 
       val client = system.actorOf(Props(new FBUser("user" + i, "name" + i,
         "about" + i, publicKeyBytes, privateKeyBytes, serverIP, serverPort,
-        system)), i.toString)
-      Thread.sleep(10)
+        system)), "user" + i.toString)
 
       client ! CreateUser
+      Thread.sleep(10)
 
-      //      system.scheduler.scheduleOnce(10000 millis, client, Schedule
-      //      ("user" + Random.nextInt(userIDList.size())))
+      val user1: String = "user" + Random.nextInt(userIDList.size)
+      println("user" + i + " will run for " + user1)
+      system.scheduler.scheduleOnce(10000 millis, client, Schedule
+      (user1))
 
-      //      client ! PrintKeys
     }
 
-    val keyPairGenerator: KeyPairGenerator = KeyPairGenerator.getInstance("RSA");
-    keyPairGenerator.initialize(2048)
-    val keyPair: KeyPair = keyPairGenerator.genKeyPair()
-    val publicKeyBytes = keyPair.getPublic
-    publicKeys += "user" + numOfUsers -> publicKeyBytes
-    val privateKeyBytes = keyPair.getPrivate
+    //    for (i <- 0 until numOfUsers) {
+    //
+    //      implicit val resolveTimeout = Timeout(10 seconds)
+    //      val actorRef = Await.result(system.actorSelection("/user/" + "user" + i)
+    //        .resolveOne(), 20 second)
+    //
+    //      system.scheduler.scheduleOnce(10000 millis, actorRef, Schedule
+    //      ("user" + Random.nextInt(userIDList.size)))
+    //    }
 
-    val client = system.actorOf(Props(new FBUser("user" + numOfUsers, "name" + numOfUsers,
-      "about" + numOfUsers, publicKeyBytes, privateKeyBytes, serverIP,
-      serverPort, system)),
-      numOfUsers
-        .toString)
-    client ! CreateUser
+    //    val keyPairGenerator: KeyPairGenerator = KeyPairGenerator.getInstance("RSA");
+    //    keyPairGenerator.initialize(2048)
+    //    val keyPair: KeyPair = keyPairGenerator.genKeyPair()
+    //    val publicKeyBytes = keyPair.getPublic
+    //    publicKeys += "user" + numOfUsers -> publicKeyBytes
+    //    val privateKeyBytes = keyPair.getPrivate
+    //
+    //    val client = system.actorOf(Props(new FBUser("user" + numOfUsers, "name" + numOfUsers,
+    //      "about" + numOfUsers, publicKeyBytes, privateKeyBytes, serverIP,
+    //      serverPort, system)),
+    //      "user"+numOfUsers
+    //        .toString)
+    //    client ! CreateUser
     //    system.scheduler.scheduleOnce(10000 millis, client, Schedule1
     //    ("user" + Random.nextInt(userIDList.size()), b))
 
-    //    client ! PrintKeys
+    //    Thread.sleep(1000)
+    //    implicit val resolveTimeout = Timeout(10 seconds)
+    //    val actorRef = Await.result(system.actorSelection("/user/user0")
+    //      .resolveOne(), 10 second)
+    //
+    //    actorRef ! PostMessage("user0", "Hello there", "private")
+    //    Thread.sleep(10)
+    //    actorRef ! GetMyPosts
 
-    Thread.sleep(1000)
-    implicit val resolveTimeout = Timeout(10 seconds)
-    val actorRef = Await.result(system.actorSelection("/user/0")
-      .resolveOne(), 10 second)
-
-    actorRef ! PostMessage("user0", "Hello there","private")
-    Thread.sleep(10)
-    actorRef ! GetMyPosts
-    //    val future2 = ask(actorRef, GetMyPosts)
-    //    Await.result(future2, 10 second)
   }
 
   class FBUser(
@@ -136,14 +147,14 @@ object Client {
     val id: String = userID
     var username: String = name
     var about: String = aboutMe
-    var postList: Map[String, Post] = new scala.collection.immutable
+    var postList: scala.collection.immutable.Map[String, Post] = new scala.collection.immutable
     .HashMap[String, Post]
-    var friendList: Set[String] = new scala.collection.immutable
+    var friendList: scala.collection.immutable.Set[String] = new scala.collection.immutable
     .HashSet[String]
     val privateKey: PrivateKey = privateKey1
     val publicKey: PublicKey = publicKey1
-    var profileKey: String = null
-    var postAESKeyMap: Map[String, String] = new scala.collection.immutable
+    var profileKey: String = ""
+    var postAESKeyMap: scala.collection.immutable.Map[String, String] = new scala.collection.immutable
     .HashMap[String, String]
 
     def hex_Digest(s: String): String = {
@@ -214,7 +225,7 @@ object Client {
 
       implicit val resolveTimeout = Timeout(10 seconds)
       val actorRef = Await.result(system.actorSelection("/user/" + id1)
-        .resolveOne(), 10 second)
+        .resolveOne(), 20 second)
 
       val future2 = ask(actorRef, GetPublicKey).mapTo[PublicKey]
       val result2 = Await.result(future2, 10 second)
@@ -226,9 +237,9 @@ object Client {
 
       implicit val resolveTimeout = Timeout(10 seconds)
       val actorRef = Await.result(system.actorSelection("/user/" + id1)
-        .resolveOne(), 10 second)
+        .resolveOne(), 20 second)
 
-      val future2 = ask(actorRef, GetAESKey(askerID, date1)).mapTo[String]
+      val future2 = ask(actorRef, GetAESKeyForPost(askerID, date1)).mapTo[String]
       val result2 = Await.result(future2, 10 second)
       result2
 
@@ -240,25 +251,17 @@ object Client {
 
       implicit val resolveTimeout = Timeout(10 seconds)
       val actorRef = Await.result(system.actorSelection("/user/" + id1)
-        .resolveOne(), 10 second)
+        .resolveOne(), 20 second)
 
-      val future2 = ask(actorRef, GetProfileKeyAES).mapTo[String]
+      val future2 = ask(actorRef, GetProfileKeyAES(askerID)).mapTo[String]
       val result2 = Await.result(future2, 10 second)
 
-      var askersPublicKey: PublicKey = null
-
-      publicKeys.get(askerID) match {
-        case Some(x) =>
-          askersPublicKey = x
-      }
-
-      encryptRSAPublic(askersPublicKey, result2)
-
+      result2
     }
 
     def receive: Receive = {
 
-      case GetAESKey(id1: String, date1: String) =>
+      case GetAESKeyForPost(id1: String, date1: String) =>
 
         var e_Pub_self_AES: String = ""
 
@@ -268,7 +271,7 @@ object Client {
         }
 
         var requesters_public_key: PublicKey = null
-        publicKeys.get("user"+id1) match {
+        publicKeys.get("user" + id1) match {
           case Some(x) =>
             requesters_public_key = x
         }
@@ -277,27 +280,34 @@ object Client {
       case GetPublicKey =>
         sender ! publicKey
 
-      case GetProfileKeyAES =>
-        sender ! profileKey
+      case GetProfileKeyAES(askerID: String) =>
+        println("inside GetProfileKeyAES: sender: " + sender + " asking profilekey of: " + id + " profileKey: " + profileKey)
+
+        var askersPublicKey: PublicKey = null
+
+        publicKeys.get(askerID) match {
+          case Some(x) =>
+            askersPublicKey = x
+        }
+
+        sender ! encryptRSAPublic(askersPublicKey, profileKey)
 
       case Schedule(id1: String) =>
-
+        
         if (!id.equalsIgnoreCase(id1))
           self ! MakeFriend(id1)
         self ! GetProfile(id1)
         self ! GetFriendList(id1)
         self ! PostMessage(id1, "This is a post from " + id + " to " +
           id1, privacyList.get(Random.nextInt(3)))
-        self ! GetMyPosts
-        self ! GetTimeline(id1)
         self ! PostPicture("album1", privacyList.get(Random.nextInt(2)))
         self ! PostPicture("album2", privacyList.get(Random.nextInt(2)))
+        self ! GetMyPosts
+        self ! GetTimeline(id1)
         self ! GetPictures(id1)
         self ! GetAlbum(id1, "album1")
         self ! GetAlbum(id1, "album2")
 
-        Thread.sleep(100)
-        self ! PoisonPill
 
       case Schedule1(id1: String, time: Long) =>
 
@@ -337,43 +347,40 @@ object Client {
           serverIP + ":" + serverPort + "/user")).withEntity(HttpEntity(ContentType(MediaTypes.`application/json`), userJSON.toString()))).mapTo[HttpResponse]
 
         val response = Await.result(future, timeout.duration)
-        println("response: CreateUser: " + response.entity.asString)
+        println("response: CreateUser: " + id + " " + response.entity.asString + "\nProfile Key: " + profileKey)
 
-        //        if (!id.equalsIgnoreCase("user0"))
-        //          println("inside create user for " + id + " result " + getPublicKey("0")
-        //            .toString)
-
-        if (!id.equalsIgnoreCase("user0")) {
-          //          self ! GetProfile("0")
-          self ! PostMessage("user0", "This is a post from " + id + "" +
-            " to user0", privacyList.get(Random.nextInt(3)))
-        }
 
       case GetProfile(id1: String) =>
 
         implicit val timeout = Timeout(10 seconds)
         val future = IO(Http)(system).ask(HttpRequest(GET, Uri(s"http://" +
-          serverIP + ":" + (serverPort) + "/profile/" + "user" + id1)))
+          serverIP + ":" + (serverPort) + "/profile/" + id1)))
           .mapTo[HttpResponse]
         val response = Await.result(future, timeout.duration)
 
         val myObject: JSONObject = new JSONObject(response.entity.asString)
 
-        val encryptedAESKey = getProfileKey(id, id1)
+        if (!id.equalsIgnoreCase(id1)) {
+          val encryptedAESKey = getProfileKey(id, id1)
 
-        val decryptedAESKey = decryptRSAPrivate(privateKey, encryptedAESKey)
+          val decryptedAESKey = decryptRSAPrivate(privateKey, encryptedAESKey)
 
-        println("Requested Profile is:\nName: " + decryptAES(decryptedAESKey,
-          "RandomInitVector", myObject.getString("username")) + "\nAbout: " + decryptAES(decryptedAESKey, "RandomInitVector", myObject.getString("about")))
+          println(id + " requested the below profile:\nName: " + decryptAES(decryptedAESKey,
+            "RandomInitVector", myObject.getString("username")) + "\nAbout: " + decryptAES(decryptedAESKey, "RandomInitVector", myObject.getString("about")))
+        }
+        else {
+          println(id + " requested the below profile:\nName: " + decryptAES
+          (profileKey, "RandomInitVector", myObject.getString("username")) + "\nAbout: " + decryptAES(profileKey, "RandomInitVector", myObject.getString("about")))
+        }
 
       case GetTimeline(id1: String) =>
 
         implicit val timeout = Timeout(10 seconds)
         val future = IO(Http)(system).ask(HttpRequest(GET, Uri(s"http://" +
           serverIP + ":" + serverPort + "/timeline?sender=" +
-          id + "&requested=" + id1)))
+          id + "&requested=" + id1))).mapTo[HttpResponse]
         val response = Await.result(future, timeout.duration)
-        println("response: GetTimeline: " + response)
+        println("response: GetTimeline: " + response.entity.asString)
 
       case PostMessage(friendID: String, content: String,
       privacy: String) =>
@@ -392,7 +399,7 @@ object Client {
 
         val response = Await.result(future, timeout.duration)
 
-        println("response: PostMessage: " + response.entity.asString)
+        println("response: PostMessage by "+id+" to "+friendID+": " + response.entity.asString)
 
       case GetMyPosts =>
 
@@ -402,38 +409,31 @@ object Client {
 
         val response = Await.result(future, timeout.duration)
 
-//        println("response: GetMyPosts raw: " + response.entity.asString)
-
         val responseList: JSONArray = new JSONArray(response.entity.asString)
-
-        println("List of Posts: " + responseList)
 
         val i: Int = responseList.length()
 
         for (x <- 0 until i) {
 
-          if (responseList.getJSONObject
-          (x).getString("from").equalsIgnoreCase(responseList.getJSONObject
-          (x).getString("to")))
-            {
-              var encryptedKey:String = ""
-              postAESKeyMap.get(responseList.getJSONObject
-              (x).getString("date")) match {
-                case Some(x) =>
-                  encryptedKey = x
-              }
-              val decryptedKey = decryptRSAPrivate(privateKey, encryptedKey)
-
-              println("Post:\n" + "From: " + responseList.getJSONObject
-              (x).getString("from") + "\nTo: " + responseList
-                .getJSONObject
-                (x).getString("to") + "\nDate: " + responseList.getJSONObject
-              (x).getString("date") + "\nContent: " + decryptAES(decryptedKey, "RandomInitVector", responseList.getJSONObject(x).getString("content")))
+          if (responseList.getJSONObject(x).getString("from").equalsIgnoreCase(responseList.getJSONObject(x).getString("to")) || responseList.getJSONObject(x).getString("from").equalsIgnoreCase(id)) {
+            var encryptedKey: String = ""
+            postAESKeyMap.get(responseList.getJSONObject
+            (x).getString("date")) match {
+              case Some(x) =>
+                encryptedKey = x
             }
+            val decryptedKey = decryptRSAPrivate(privateKey, encryptedKey)
+
+            println("Post:\n" + "From: " + responseList.getJSONObject
+            (x).getString("from") + "\nTo: " + responseList
+              .getJSONObject
+              (x).getString("to") + "\nDate: " + responseList.getJSONObject
+            (x).getString("date") + "\nContent: " + decryptAES(decryptedKey, "RandomInitVector", responseList.getJSONObject(x).getString("content")))
+          }
 
           else {
-            val encryptedKey = getAESKey(id.substring(4), responseList.getJSONObject
-            (x).getString("from").substring(4), responseList.getJSONObject
+            val encryptedKey = getAESKey(id, responseList.getJSONObject
+            (x).getString("from"), responseList.getJSONObject
             (x).getString("date"))
 
             val decryptedKey = decryptRSAPrivate(privateKey, encryptedKey)
@@ -453,16 +453,16 @@ object Client {
           serverIP + ":" + serverPort + "/makefriend")).withEntity
         (HttpEntity(ContentType(MediaTypes.`application/json`), friendRequestJSON.toString()))).mapTo[HttpResponse]
         val response = Await.result(future, timeout.duration)
-        println("response: MakeFriend: " + id + " is making friends with " + id1 + " " + response)
+        println("response: MakeFriend: " + id + " is making friends with " + id1 + " " + response.entity.asString)
 
       case GetFriendList(id1: String) =>
 
         implicit val timeout = Timeout(10 seconds)
         val future = IO(Http)(system).ask(HttpRequest(GET, Uri(s"http://" +
-          serverIP + ":" + serverPort + "/getfriends/" + id1)))
+          serverIP + ":" + serverPort + "/getfriends/" + id1))).mapTo[HttpResponse]
         val response = Await.result(future, timeout.duration)
         println("response: GetFriendList: " + id + " is getting " + id1 + "'s friends " +
-          response)
+          response.entity.asString)
 
       case PostPicture(albumID: String, privacy: String) =>
 
@@ -476,35 +476,35 @@ object Client {
         val future = IO(Http)(system).ask(HttpRequest(POST, Uri(s"http://" +
           serverIP + ":" + serverPort + "/picture")).withEntity(HttpEntity(ContentType(MediaTypes.`application/json`), imageJSON.toString()))).mapTo[HttpResponse]
         val response = Await.result(future, timeout.duration)
-        println("response: PostPicture: " + response)
+        println("response: PostPicture: " + response.entity.asString)
 
       case GetPictures(id1: String) =>
 
         implicit val timeout = Timeout(10 seconds)
         val future = IO(Http)(system).ask(HttpRequest(GET, Uri(s"http://" +
           serverIP + ":" + serverPort + "/picture?sender=" +
-          id1 + "&requested=" + id)))
+          id1 + "&requested=" + id))).mapTo[HttpResponse]
         val response = Await.result(future, timeout.duration)
-        println("response: GetPictures: " + response)
+        println("response: GetPictures: " + response.entity.asString)
 
       case GetAlbum(requestorID: String, albumID: String) =>
 
         implicit val timeout = Timeout(10 seconds)
         val future = IO(Http)(system).ask(HttpRequest(GET, Uri(s"http://" +
           serverIP + ":" + serverPort + "/album?albumowner=" + requestorID + "&requestorid=" +
-          id + "&requestedalbum=" + albumID)))
+          id + "&requestedalbum=" + albumID))).mapTo[HttpResponse]
         val response = Await.result(future, timeout.duration)
-        println("response: GetAlbum: " + response)
+        println("response: GetAlbum: " + response.entity.asString)
     }
   }
 
 }
 
-case class GetAESKey(id1: String, date1: String)
+case class GetAESKeyForPost(id1: String, date1: String)
 
 case class GetPublicKey()
 
-case class GetProfileKeyAES()
+case class GetProfileKeyAES(askerID: String)
 
 case class Schedule(id: String)
 
