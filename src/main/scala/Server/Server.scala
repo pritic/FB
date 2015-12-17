@@ -16,6 +16,7 @@ import spray.httpx.SprayJsonSupport._
 import spray.routing._
 
 import scala.collection.immutable.Map
+import scala.collection.mutable.ArrayBuffer
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
@@ -111,6 +112,12 @@ trait RestApi extends HttpService with ActorLogging {
 
   var challengeMap: Map[String, String] = new scala.collection.immutable
   .HashMap[String, String]
+
+  //keys encrypted with public key of sender mapped by date
+  var postAESFromMap: Map[String, String] = new scala.collection.immutable.HashMap[String, String]
+
+  //keys encrypted with public key of reciever mapped by date
+  var postAESToMap: Map[String, String] = new scala.collection.immutable.HashMap[String, String]
 
   def routes: Route =
 
@@ -231,7 +238,83 @@ trait RestApi extends HttpService with ActorLogging {
           val responder = createResponder(requestContext)
           responder ! checkAnswer(id, answer).toString()
         }
+      } ~
+      pathPrefix("givePublicKey") {
+        path(Segment) { id =>
+          get { requestContext =>
+            val responder = createResponder(requestContext)
+            responder ! sendPublicKey(id).toString()
+          }
+        }
+      } ~
+      pathPrefix("postFromMap") {
+        pathEnd {
+          post {
+            entity(as[KeyData]) { keyData => requestContext =>
+              val responder = createResponder(requestContext)
+              addInFromMap(keyData)
+              responder ! FromCreated
+            }
+          }
+        }
+      } ~
+      pathPrefix("postToMap") {
+        pathEnd {
+          post {
+            entity(as[KeyData]) { keyData => requestContext =>
+              val responder = createResponder(requestContext)
+              addInToMap(keyData)
+              responder ! ToCreated
+            }
+          }
+        }
+      } ~
+      (path("getFromKey") & get) {
+        parameters("date") { (date) => requestContext =>
+          val responder = createResponder(requestContext)
+          responder ! getFromMap(date).toString()
+        }
+      } ~
+      (path("getToKey") & get) {
+        parameters("date") { (date) => requestContext =>
+          val responder = createResponder(requestContext)
+          responder ! getToMap(date).toString()
+        }
       }
+
+  private def getFromMap(date: String): String = {
+
+    postAESFromMap.get(date) match {
+      case Some(x) =>
+        x
+    }
+  }
+
+  private def getToMap(date: String): String = {
+
+    postAESToMap.get(date) match {
+      case Some(x) =>
+        x
+    }
+  }
+
+  private def addInFromMap(keyData: KeyData): Unit = {
+
+    postAESFromMap += keyData.date -> keyData.key
+  }
+
+  private def addInToMap(keyData: KeyData): Unit = {
+
+    postAESToMap += keyData.date -> keyData.key
+  }
+
+  private def sendPublicKey(id: String): String = {
+
+    publicKeys.get(id) match {
+      case Some(x) =>
+        x
+    }
+  }
 
   private def checkAnswer(id: String, answer: String): String = {
 
@@ -561,6 +644,14 @@ class Responder(requestContext: RequestContext) extends Actor with ActorLogging 
       killYourself
 
     case ImageCreated =>
+      requestContext.complete(StatusCodes.Created)
+      killYourself
+
+    case FromCreated =>
+      requestContext.complete(StatusCodes.Created)
+      killYourself
+
+    case ToCreated =>
       requestContext.complete(StatusCodes.Created)
       killYourself
 

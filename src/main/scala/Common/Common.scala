@@ -34,6 +34,8 @@ object Common {
                    date: String, from: String, to: String, privacy: String,
                    content: String)
 
+  case class KeyData(date: String, key: String)
+
   case class Friend(username: String, friendList: scala.collection.immutable.Set[String])
 
   case class Picture(date: String, from: String, albumID: String, privacy: String, pictureContent: String)
@@ -50,6 +52,10 @@ object Common {
 
   case object ImageCreated
 
+  case object FromCreated
+
+  case object ToCreated
+
   case object ProfileAlreadyExists
 
   case object FriendsMade
@@ -59,6 +65,11 @@ object Common {
   case object AlbumResponse1
 
   /* json (un)marshalling */
+
+  object KeyData extends DefaultJsonProtocol {
+
+    implicit val format = jsonFormat2(KeyData.apply)
+  }
 
   object Friend extends DefaultJsonProtocol {
 
@@ -117,6 +128,8 @@ object Common {
 
   implicit def toProfile(user: User): Profile = Profile(username =
     user.username, about = user.about)
+
+  implicit def toKeyData(keyData: KeyData): KeyData = KeyData(date = keyData.date, key = keyData.key)
 
   implicit def toTimeline(user: User): TimeLine = TimeLine(username =
     user.username, postList = user.postList)
