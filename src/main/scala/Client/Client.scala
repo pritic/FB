@@ -271,25 +271,24 @@ object Client {
 
       case Schedule(id1: String) =>
 
-        //        self ! authenticate
 
         if (!id.equalsIgnoreCase(id1))
           self ! MakeFriend(id1)
         self ! GetProfile(id1)
         self ! GetFriendList(id1)
-        //        self ! PostMessage(id1, "This is a post from " + id + " to " + id1, privacyList.get(Random.nextInt(3)))
-        val randomuser = "user" + Random.nextInt(userIDList.size)
+        var randomuser = "user" + Random.nextInt(userIDList.size)
         self ! PostMessage(randomuser, "This is a post from " + id + " to " + randomuser + " - random post", "public")
+        randomuser = "user" + Random.nextInt(userIDList.size)
         self ! PostMessage(randomuser, "This is a post from " + id + " to " + randomuser + " - random post", "public")
         self ! PostMessage(id1, "This is a post from " + id + " to " + id1, privacyList.get(Random.nextInt(3)))
 
-                      self ! PostPicture("album1", privacyList.get(Random.nextInt(2)))
-                      self ! PostPicture("album2", privacyList.get(Random.nextInt(2)))
-        //              self ! GetMyPosts
+        self ! PostPicture("album1", privacyList.get(Random.nextInt(2)))
+        self ! PostPicture("album2", privacyList.get(Random.nextInt(2)))
+        self ! GetMyPosts
         self ! GetTimeline(id1)
-              self ! GetPictures(id1)
-              self ! GetAlbum(id1, "album1")
-              self ! GetAlbum(id1, "album2")
+        self ! GetPictures(id1)
+        self ! GetAlbum(id1, "album1")
+        self ! GetAlbum(id1, "album2")
 
       case CreateUser =>
 
@@ -341,7 +340,7 @@ object Client {
 
           val response = Await.result(future, timeout.duration)
 
-          println("response: GetTimeline raw: " + response.entity.asString)
+          //          println("response: GetTimeline raw: " + response.entity.asString)
 
           val responseList: JSONArray = new JSONArray(response.entity.asString)
 
@@ -484,7 +483,7 @@ object Client {
           val response = Await.result(future, timeout.duration)
           println("response: PostPicture: " + response.entity.asString)
         }
-        else{
+        else {
           println("You are not an authorized user")
         }
 
@@ -497,14 +496,13 @@ object Client {
             id1 + "&requested=" + id))).mapTo[HttpResponse]
           val response = Await.result(future, timeout.duration)
           val responseList: JSONArray = new JSONArray(response.entity.asString)
-          println("List of Pictures: " + responseList)
+          //          println("List of Pictures: " + responseList)
 
           val i: Int = responseList.length()
 
           for (x <- 0 until i) {
-            if (responseList.getJSONObject(x).getString("from").equalsIgnoreCase(responseList.getJSONObject(x).getString("to")) || responseList.getJSONObject(x).getString("from").equalsIgnoreCase(id))
-            {
-              var encryptedKey:String = ""
+            if (responseList.getJSONObject(x).getString("from").equalsIgnoreCase(responseList.getJSONObject(x).getString("to")) || responseList.getJSONObject(x).getString("from").equalsIgnoreCase(id)) {
+              var encryptedKey: String = ""
               postAESKeyMap.get(responseList.getJSONObject
               (x).getString("date")) match {
                 case Some(x) =>
@@ -517,11 +515,11 @@ object Client {
               println("Picture:\n" + "From: " + responseList.getJSONObject
               (x).getString("from") + "\nAlbum: " + responseList
                 .getJSONObject
-                (x).getString("to") +"\nRequestedBy: "+id+ "\nDate: " + responseList.getJSONObject
+                (x).getString("to") + "\nRequestedBy: " + id + "\nDate: " + responseList.getJSONObject
               (x).getString("date") + "\nContent: " + decryptAES(decryptedKey, "RandomInitVector", responseList.getJSONObject(x).getString("content")))
             }
             else {
-              val encryptedKey = getAESKey(id,responseList.getJSONObject
+              val encryptedKey = getAESKey(id, responseList.getJSONObject
               (x).getString("from"), responseList.getJSONObject
               (x).getString("date"))
 
@@ -529,12 +527,12 @@ object Client {
               println("Post:\n" + "From: " + responseList.getJSONObject
               (x).getString("from") + "\nTo: " + responseList
                 .getJSONObject
-                (x).getString("to") +"\nRequestedBy: "+id+  "\nDate: " + responseList.getJSONObject
+                (x).getString("to") + "\nRequestedBy: " + id + "\nDate: " + responseList.getJSONObject
               (x).getString("date") + "\nContent: " + decryptAES(decryptedKey, "RandomInitVector", responseList.getJSONObject(x).getString("content")))
             }
           }
         }
-        else{
+        else {
           println("You are not an authorized user")
         }
 
@@ -547,16 +545,15 @@ object Client {
             id + "&requestedalbum=" + albumID))).mapTo[HttpResponse]
           val response = Await.result(future, timeout.duration)
           val responseList: JSONArray = new JSONArray(response.entity.asString)
-          println("List of Pictures from specific Album: " + responseList)
+          //          println("List of Pictures from specific Album: " + responseList)
 
           val i: Int = responseList.length()
 
           for (x <- 0 until i) {
 
             if (responseList.getJSONObject
-            (x).getString("from").equalsIgnoreCase(id))
-            {
-              var encryptedKey:String = ""
+            (x).getString("from").equalsIgnoreCase(id)) {
+              var encryptedKey: String = ""
               postAESKeyMap.get(responseList.getJSONObject
               (x).getString("date")) match {
                 case Some(x) =>
@@ -569,11 +566,11 @@ object Client {
               println("Album:\n" + "From: " + responseList.getJSONObject
               (x).getString("from") + "\nAlbum: " + responseList
                 .getJSONObject
-                (x).getString("to") +"\nRequestedBy: "+id+ "\nDate: " + responseList.getJSONObject
+                (x).getString("to") + "\nRequestedBy: " + id + "\nDate: " + responseList.getJSONObject
               (x).getString("date") + "\nContent: " + decryptAES(decryptedKey, "RandomInitVector", responseList.getJSONObject(x).getString("content")))
             }
             else {
-              val encryptedKey = getAESKey( id,responseList.getJSONObject
+              val encryptedKey = getAESKey(id, responseList.getJSONObject
               (x).getString("from"), responseList.getJSONObject
               (x).getString("date"))
 
@@ -581,12 +578,12 @@ object Client {
               println("Post:\n" + "From: " + responseList.getJSONObject
               (x).getString("from") + "\nTo: " + responseList
                 .getJSONObject
-                (x).getString("to") +"\nRequestedBy: "+id+  "\nDate: " + responseList.getJSONObject
+                (x).getString("to") + "\nRequestedBy: " + id + "\nDate: " + responseList.getJSONObject
               (x).getString("date") + "\nContent: " + decryptAES(decryptedKey, "RandomInitVector", responseList.getJSONObject(x).getString("content")))
             }
           }
         }
-        else{
+        else {
           println("You are not an authorized user")
         }
     }
