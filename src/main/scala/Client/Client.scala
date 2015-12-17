@@ -240,6 +240,8 @@ object Client {
         postAESKeyMap.get(date1) match {
           case Some(x) =>
             e_Pub_self_AES = x
+          case None =>
+            println("Key Not found")
         }
 
         var requesters_public_key: PublicKey = null
@@ -247,6 +249,8 @@ object Client {
         publicKeys.get(id1) match {
           case Some(x) =>
             requesters_public_key = x
+          case None =>
+            println("Key Not found")
 
         }
         sender ! encryptRSAPublic(requesters_public_key, decryptRSAPrivate(privateKey, e_Pub_self_AES))
@@ -279,13 +283,13 @@ object Client {
         self ! PostMessage(randomuser, "This is a post from " + id + " to " + randomuser + " - random post", "public")
         self ! PostMessage(id1, "This is a post from " + id + " to " + id1, privacyList.get(Random.nextInt(3)))
 
-        //              self ! PostPicture("album1", privacyList.get(Random.nextInt(2)))
-        //              self ! PostPicture("album2", privacyList.get(Random.nextInt(2)))
+                      self ! PostPicture("album1", privacyList.get(Random.nextInt(2)))
+                      self ! PostPicture("album2", privacyList.get(Random.nextInt(2)))
         //              self ! GetMyPosts
         self ! GetTimeline(id1)
-      //        self ! GetPictures(id1)
-      //        self ! GetAlbum(id1, "album1")
-      //        self ! GetAlbum(id1, "album2")
+              self ! GetPictures(id1)
+              self ! GetAlbum(id1, "album1")
+              self ! GetAlbum(id1, "album2")
 
       case CreateUser =>
 
@@ -351,6 +355,8 @@ object Client {
               (x).getString("date")) match {
                 case Some(x) =>
                   encryptedKey = x
+                case None =>
+                  println("Key Not found")
               }
               val decryptedKey = decryptRSAPrivate(privateKey, encryptedKey)
 
@@ -459,35 +465,130 @@ object Client {
 
       case PostPicture(albumID: String, privacy: String) =>
 
-        val is = this.getClass.getClassLoader().getResourceAsStream("picture.jpg");
-        val stream = Stream.continually(is.read).takeWhile(_ != -1).map(_.toByte)
-        val bytes = stream.toArray
-        val pictureBase64String = new sun.misc.BASE64Encoder().encode(bytes)
-        val imageJSON = new Picture(System.currentTimeMillis().toString, id, albumID, privacy, pictureBase64String)
-          .toJson
-        implicit val timeout = Timeout(10 seconds)
-        val future = IO(Http)(system).ask(HttpRequest(POST, Uri(s"http://" +
-          serverIP + ":" + serverPort + "/picture")).withEntity(HttpEntity(ContentType(MediaTypes.`application/json`), imageJSON.toString()))).mapTo[HttpResponse]
-        val response = Await.result(future, timeout.duration)
-        println("response: PostPicture: " + response.entity.asString)
+        if (authenticate().equals("true")) {
+          val is = this.getClass.getClassLoader().getResourceAsStream("picture.jpg");
+          val stream = Stream.continually(is.read).takeWhile(_ != -1).map(_.toByte)
+          val bytes = stream.toArray
+          val pictureBase64String = new sun.misc.BASE64Encoder().encode(bytes)
+          val key = getSecureRandom
+          val encryptedPictureBase64String = encryptAES(key, "RandomInitVector", pictureBase64String)
+          val date1 = System.currentTimeMillis().toString
+
+          postAESKeyMap += (date1 -> encryptRSAPublic(publicKey, key))
+
+          val imageJSON = new Picture(date1, id, albumID, privacy, encryptedPictureBase64String)
+            .toJson
+          implicit val timeout = Timeout(10 seconds)
+          val future = IO(Http)(system).ask(HttpRequest(POST, Uri(s"http://" +
+            serverIP + ":" + serverPort + "/picture")).withEntity(HttpEntity(ContentType(MediaTypes.`application/json`), imageJSON.toString()))).mapTo[HttpResponse]
+          val response = Await.result(future, timeout.duration)
+          println("response: PostPicture: " + response.entity.asString)
+        }
+        else{
+          println("You are not an authorized user")
+        }
 
       case GetPictures(id1: String) =>
 
-        implicit val timeout = Timeout(10 seconds)
-        val future = IO(Http)(system).ask(HttpRequest(GET, Uri(s"http://" +
-          serverIP + ":" + serverPort + "/picture?sender=" +
-          id1 + "&requested=" + id))).mapTo[HttpResponse]
-        val response = Await.result(future, timeout.duration)
-        println("response: GetPictures: " + response.entity.asString)
+        if (authenticate().equals("true")) {
+          implicit val timeout = Timeout(10 seconds)
+          val future = IO(Http)(system).ask(HttpRequest(GET, Uri(s"http://" +
+            serverIP + ":" + serverPort + "/picture?sender=" +
+            id1 + "&requested=" + id))).mapTo[HttpResponse]
+          val response = Await.result(future, timeout.duration)
+          val responseList: JSONArray = new JSONArray(response.entity.asString)
+          println("List of Pictures: " + responseList)
+
+          val i: Int = responseList.length()
+
+          for (x <- 0 until i) {
+            if (responseList.getJSONObject(x).getString("from").equalsIgnoreCase(responseList.getJSONObject(x).getString("to")) || responseList.getJSONObject(x).getString("from").equalsIgnoreCase(id))
+            {
+              var encryptedKey:String = ""
+              postAESKeyMap.get(responseList.getJSONObject
+              (x).getString("date")) match {
+                case Some(x) =>
+                  encryptedKey = x
+                case None =>
+                  println("Key Not found")
+              }
+              val decryptedKey = decryptRSAPrivate(privateKey, encryptedKey)
+
+              println("Picture:\n" + "From: " + responseList.getJSONObject
+              (x).getString("from") + "\nAlbum: " + responseList
+                .getJSONObject
+                (x).getString("to") +"\nRequestedBy: "+id+ "\nDate: " + responseList.getJSONObject
+              (x).getString("date") + "\nContent: " + decryptAES(decryptedKey, "RandomInitVector", responseList.getJSONObject(x).getString("content")))
+            }
+            else {
+              val encryptedKey = getAESKey(id,responseList.getJSONObject
+              (x).getString("from"), responseList.getJSONObject
+              (x).getString("date"))
+
+              val decryptedKey = decryptRSAPrivate(privateKey, encryptedKey)
+              println("Post:\n" + "From: " + responseList.getJSONObject
+              (x).getString("from") + "\nTo: " + responseList
+                .getJSONObject
+                (x).getString("to") +"\nRequestedBy: "+id+  "\nDate: " + responseList.getJSONObject
+              (x).getString("date") + "\nContent: " + decryptAES(decryptedKey, "RandomInitVector", responseList.getJSONObject(x).getString("content")))
+            }
+          }
+        }
+        else{
+          println("You are not an authorized user")
+        }
 
       case GetAlbum(requestorID: String, albumID: String) =>
 
-        implicit val timeout = Timeout(10 seconds)
-        val future = IO(Http)(system).ask(HttpRequest(GET, Uri(s"http://" +
-          serverIP + ":" + serverPort + "/album?albumowner=" + requestorID + "&requestorid=" +
-          id + "&requestedalbum=" + albumID))).mapTo[HttpResponse]
-        val response = Await.result(future, timeout.duration)
-        println("response: GetAlbum: " + response.entity.asString)
+        if (authenticate().equals("true")) {
+          implicit val timeout = Timeout(10 seconds)
+          val future = IO(Http)(system).ask(HttpRequest(GET, Uri(s"http://" +
+            serverIP + ":" + serverPort + "/album?albumowner=" + requestorID + "&requestorid=" +
+            id + "&requestedalbum=" + albumID))).mapTo[HttpResponse]
+          val response = Await.result(future, timeout.duration)
+          val responseList: JSONArray = new JSONArray(response.entity.asString)
+          println("List of Pictures from specific Album: " + responseList)
+
+          val i: Int = responseList.length()
+
+          for (x <- 0 until i) {
+
+            if (responseList.getJSONObject
+            (x).getString("from").equalsIgnoreCase(id))
+            {
+              var encryptedKey:String = ""
+              postAESKeyMap.get(responseList.getJSONObject
+              (x).getString("date")) match {
+                case Some(x) =>
+                  encryptedKey = x
+                case None =>
+                  println("Key Not found")
+              }
+              val decryptedKey = decryptRSAPrivate(privateKey, encryptedKey)
+
+              println("Album:\n" + "From: " + responseList.getJSONObject
+              (x).getString("from") + "\nAlbum: " + responseList
+                .getJSONObject
+                (x).getString("to") +"\nRequestedBy: "+id+ "\nDate: " + responseList.getJSONObject
+              (x).getString("date") + "\nContent: " + decryptAES(decryptedKey, "RandomInitVector", responseList.getJSONObject(x).getString("content")))
+            }
+            else {
+              val encryptedKey = getAESKey( id,responseList.getJSONObject
+              (x).getString("from"), responseList.getJSONObject
+              (x).getString("date"))
+
+              val decryptedKey = decryptRSAPrivate(privateKey, encryptedKey)
+              println("Post:\n" + "From: " + responseList.getJSONObject
+              (x).getString("from") + "\nTo: " + responseList
+                .getJSONObject
+                (x).getString("to") +"\nRequestedBy: "+id+  "\nDate: " + responseList.getJSONObject
+              (x).getString("date") + "\nContent: " + decryptAES(decryptedKey, "RandomInitVector", responseList.getJSONObject(x).getString("content")))
+            }
+          }
+        }
+        else{
+          println("You are not an authorized user")
+        }
     }
   }
 
