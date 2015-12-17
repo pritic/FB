@@ -233,7 +233,8 @@ trait RestApi extends HttpService with ActorLogging {
         }
       }
 
-  private def checkAnswer(id:String, answer:String): String = {
+  private def checkAnswer(id: String, answer: String): String = {
+
     challengeMap.get(id) match {
       case Some(x) =>
         if (answer.equals(x))
@@ -245,12 +246,13 @@ trait RestApi extends HttpService with ActorLogging {
         "false"
     }
   }
+
   private def sendChallenge(id: String): String = {
 
     val random: SecureRandom = SecureRandom.getInstance("SHA1PRNG")
     val value = random.nextInt().toString()
     challengeMap += id -> value
-    var keyFromMap:String = ""
+    var keyFromMap: String = ""
     publicKeys.get(id) match {
       case Some(x) =>
         keyFromMap = x
@@ -342,6 +344,7 @@ trait RestApi extends HttpService with ActorLogging {
     var requestedPostList: List[Post] = List[Post]()
     var isFriend: Boolean = false
 
+    //fetching own timeline
     if (from.equalsIgnoreCase(to)) {
       allUserPostsMap.get(to) match {
         case Some(x) =>

@@ -194,8 +194,7 @@ object Client {
     def getAESKey(askerID: String, id1: String, date1: String): String = {
 
       implicit val resolveTimeout = Timeout(10 seconds)
-      val actorRef = Await.result(system.actorSelection("/user/" + id1)
-        .resolveOne(), 20 second)
+      val actorRef = Await.result(system.actorSelection("/user/" + id1).resolveOne(), 20 second)
 
       val future2 = ask(actorRef, GetAESKeyForPost(askerID, date1)).mapTo[String]
       val result2 = Await.result(future2, 10 second)
@@ -207,12 +206,10 @@ object Client {
     def getProfileKey(askerID: String, id1: String): String = {
 
       implicit val resolveTimeout = Timeout(10 seconds)
-      val actorRef = Await.result(system.actorSelection("/user/" + id1)
-        .resolveOne(), 20 second)
+      val actorRef = Await.result(system.actorSelection("/user/" + id1).resolveOne(), 20 second)
 
       val future2 = ask(actorRef, GetProfileKeyAES(askerID)).mapTo[String]
       val result2 = Await.result(future2, 10 second)
-
       result2
     }
 
@@ -236,7 +233,7 @@ object Client {
 
     def receive: Receive = {
 
-      case GetAESKeyForPost(id1: String, date1: String) =>
+      case GetAESKeyForPost(id1: String, date1: String) => {
 
         var e_Pub_self_AES: String = ""
 
@@ -246,12 +243,14 @@ object Client {
         }
 
         var requesters_public_key: PublicKey = null
-        publicKeys.get("user" + id1) match {
+
+        publicKeys.get(id1) match {
           case Some(x) =>
             requesters_public_key = x
+
         }
         sender ! encryptRSAPublic(requesters_public_key, decryptRSAPrivate(privateKey, e_Pub_self_AES))
-
+      }
       case GetPublicKey =>
         sender ! publicKey
 
@@ -274,7 +273,12 @@ object Client {
           self ! MakeFriend(id1)
         self ! GetProfile(id1)
         self ! GetFriendList(id1)
+        //        self ! PostMessage(id1, "This is a post from " + id + " to " + id1, privacyList.get(Random.nextInt(3)))
+        val randomuser = "user" + Random.nextInt(userIDList.size)
+        self ! PostMessage(randomuser, "This is a post from " + id + " to " + randomuser + " - random post", "public")
+        self ! PostMessage(randomuser, "This is a post from " + id + " to " + randomuser + " - random post", "public")
         self ! PostMessage(id1, "This is a post from " + id + " to " + id1, privacyList.get(Random.nextInt(3)))
+
         //              self ! PostPicture("album1", privacyList.get(Random.nextInt(2)))
         //              self ! PostPicture("album2", privacyList.get(Random.nextInt(2)))
         //              self ! GetMyPosts
@@ -324,6 +328,7 @@ object Client {
         }
         else
           println("You are not an authorized user")
+
       case GetTimeline(id1: String) =>
         if (authenticate().equals("true")) {
           implicit val timeout = Timeout(10 seconds)
@@ -332,7 +337,7 @@ object Client {
 
           val response = Await.result(future, timeout.duration)
 
-          //        println("response: GetTimeline raw: " + response.entity.asString)
+          println("response: GetTimeline raw: " + response.entity.asString)
 
           val responseList: JSONArray = new JSONArray(response.entity.asString)
 
@@ -340,7 +345,7 @@ object Client {
 
           for (x <- 0 until i) {
 
-            if (responseList.getJSONObject(x).getString("from").equalsIgnoreCase(responseList.getJSONObject(x).getString("to")) || responseList.getJSONObject(x).getString("from").equalsIgnoreCase(id)) {
+            if (responseList.getJSONObject(x).getString("from").equalsIgnoreCase(id)) {
               var encryptedKey: String = ""
               postAESKeyMap.get(responseList.getJSONObject
               (x).getString("date")) match {
@@ -401,7 +406,7 @@ object Client {
 
           for (x <- 0 until i) {
 
-            if (responseList.getJSONObject(x).getString("from").equalsIgnoreCase(responseList.getJSONObject(x).getString("to")) || responseList.getJSONObject(x).getString("from").equalsIgnoreCase(id)) {
+            if (responseList.getJSONObject(x).getString("from").equalsIgnoreCase(id)) {
               var encryptedKey: String = ""
               postAESKeyMap.get(responseList.getJSONObject(x).getString("date")) match {
                 case Some(x) =>
