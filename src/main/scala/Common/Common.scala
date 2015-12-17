@@ -95,7 +95,6 @@ object Common {
     implicit val format = jsonFormat6(User.apply)
   }
 
-
   object Profile extends DefaultJsonProtocol {
 
     implicit val format = jsonFormat2(Profile.apply)
@@ -112,7 +111,7 @@ object Common {
     id = user.id,
     username = user.username,
     about = user.about,
-  publicKey = user.publicKey,
+    publicKey = user.publicKey,
     postList = user.postList,
     friendList = user.friendList)
 
