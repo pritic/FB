@@ -1,10 +1,15 @@
 package Server
 
+import java.security.spec.X509EncodedKeySpec
+import java.security.{KeyFactory, PublicKey, SecureRandom}
+import javax.crypto.Cipher
+
 import akka.actor._
 import akka.io.IO
 import akka.pattern.ask
 import akka.util.Timeout
 import com.typesafe.config.ConfigFactory
+import org.apache.commons.codec.binary.Base64
 import spray.can.Http
 import spray.http.StatusCodes
 import spray.httpx.SprayJsonSupport._
@@ -102,6 +107,9 @@ trait RestApi extends HttpService with ActorLogging {
   var allUserPicturesMap: Map[String, List[Picture]] = new scala.collection.immutable.HashMap[String, List[Picture]]
 
   var publicKeys: Map[String, String] = new scala.collection.immutable
+  .HashMap[String, String]
+
+  var challengeMap: Map[String, String] = new scala.collection.immutable
   .HashMap[String, String]
 
   def routes: Route =
@@ -209,7 +217,54 @@ trait RestApi extends HttpService with ActorLogging {
           val responder = createResponder(requestContext)
           responder ! getAlbum(owner, requestedby, albumID)
         }
+      } ~
+      pathPrefix("authenticate") {
+        path(Segment) { id =>
+          get { requestContext =>
+            val responder = createResponder(requestContext)
+            responder ! sendChallenge(id).toString()
+          }
+        }
+      } ~
+      (path("checkAnswer") & get) {
+        parameters("sender", "answer") { (id, answer) => requestContext =>
+          val responder = createResponder(requestContext)
+          responder ! checkAnswer(id, answer).toString()
+        }
       }
+
+  private def checkAnswer(id:String, answer:String): String = {
+    challengeMap.get(id) match {
+      case Some(x) =>
+        if (answer.equals(x))
+          "true"
+        else
+          "false"
+
+      case None =>
+        "false"
+    }
+  }
+  private def sendChallenge(id: String): String = {
+
+    val random: SecureRandom = SecureRandom.getInstance("SHA1PRNG")
+    val value = random.nextInt().toString()
+    challengeMap += id -> value
+    var keyFromMap:String = ""
+    publicKeys.get(id) match {
+      case Some(x) =>
+        keyFromMap = x
+    }
+    val publicBytes: Array[Byte] = Base64.decodeBase64(keyFromMap)
+    val keySpec: X509EncodedKeySpec = new X509EncodedKeySpec(publicBytes)
+    val keyFactory: KeyFactory = KeyFactory.getInstance("RSA")
+    val publicKey: PublicKey = keyFactory.generatePublic(keySpec)
+    val cipher: Cipher = Cipher.getInstance("RSA/ECB/PKCS1PADDING")
+    // encrypt the plain text using the public key
+    cipher.init(Cipher.ENCRYPT_MODE, publicKey)
+    val encrypted: Array[Byte] = cipher.doFinal(value.getBytes())
+    Base64.encodeBase64String(encrypted)
+  }
 
   private def createResponder(requestContext: RequestContext) = {
 

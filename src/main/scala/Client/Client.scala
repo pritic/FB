@@ -38,8 +38,7 @@ object Client {
   privacyList.put(1, "public")
   privacyList.put(2, "private")
 
-  var publicKeys: scala.collection.immutable.Map[String, PublicKey] = new scala.collection.immutable
-  .HashMap[String, PublicKey]
+  var publicKeys: scala.collection.immutable.Map[String, PublicKey] = new scala.collection.immutable.HashMap[String, PublicKey]
 
   def main(args: Array[String]): Unit = {
 
@@ -82,19 +81,15 @@ object Client {
       publicKeys += "user" + i -> publicKeyBytes
       val privateKeyBytes = keyPair.getPrivate
 
-      val client = system.actorOf(Props(new FBUser("user" + i, "name" + i,
-        "about" + i, publicKeyBytes, privateKeyBytes, serverIP, serverPort,
-        system)), "user" + i.toString)
+      val client = system.actorOf(Props(new FBUser("user" + i, "name" + i, "about" + i, publicKeyBytes, privateKeyBytes, serverIP, serverPort, system)), "user" + i.toString)
 
       client ! CreateUser
       Thread.sleep(10)
 
       val user1: String = "user" + Random.nextInt(userIDList.size)
-      system.scheduler.scheduleOnce(10000 millis, client, Schedule
-      (user1))
 
+      system.scheduler.scheduleOnce(10000 millis, client, Schedule(user1))
     }
-
   }
 
   class FBUser(
@@ -118,8 +113,7 @@ object Client {
     val privateKey: PrivateKey = privateKey1
     val publicKey: PublicKey = publicKey1
     var profileKey: String = ""
-    var postAESKeyMap: scala.collection.immutable.Map[String, String] = new scala.collection.immutable
-    .HashMap[String, String]
+    var postAESKeyMap: scala.collection.immutable.Map[String, String] = new scala.collection.immutable.HashMap[String, String]
 
     def hex_Digest(s: String): String = {
 
@@ -210,7 +204,6 @@ object Client {
     }
 
     //sends AES key encrypted with the requested profile user's public key
-
     def getProfileKey(askerID: String, id1: String): String = {
 
       implicit val resolveTimeout = Timeout(10 seconds)
@@ -221,6 +214,24 @@ object Client {
       val result2 = Await.result(future2, 10 second)
 
       result2
+    }
+
+    def authenticate(): String = {
+
+      implicit val timeout = Timeout(10 seconds)
+      val future = IO(Http)(system).ask(HttpRequest(GET, Uri(s"http://" + serverIP + ":" + serverPort + "/authenticate/" + id))).mapTo[HttpResponse]
+
+      val response = Await.result(future, timeout.duration)
+
+      val answer = decryptRSAPrivate(privateKey, response.entity.asString)
+
+      val future1 = IO(Http)(system).ask(HttpRequest(GET, Uri(s"http://" + serverIP + ":" + serverPort + "/checkAnswer?sender=" + id + "&answer=" + answer))).mapTo[HttpResponse]
+
+      val response1 = Await.result(future1, timeout.duration)
+
+      println("response: Authentication: " + response1.entity.asString)
+
+      response1.entity.asString
     }
 
     def receive: Receive = {
@@ -256,22 +267,21 @@ object Client {
         sender ! encryptRSAPublic(askersPublicKey, profileKey)
 
       case Schedule(id1: String) =>
-        
+
+        //        self ! authenticate
+
         if (!id.equalsIgnoreCase(id1))
           self ! MakeFriend(id1)
-//        self ! GetProfile(id1)
-//        self ! GetFriendList(id1)
-        self ! PostMessage(id1, "This is a post from " + id + " to " +
-          id1, privacyList.get(Random.nextInt(3)))
-        self ! PostMessage(id1, "This is a post from " + id + " to " +
-          id1, privacyList.get(Random.nextInt(3)))
-//        self ! PostPicture("album1", privacyList.get(Random.nextInt(2)))
-//        self ! PostPicture("album2", privacyList.get(Random.nextInt(2)))
-//        self ! GetMyPosts
+        self ! GetProfile(id1)
+        self ! GetFriendList(id1)
+        self ! PostMessage(id1, "This is a post from " + id + " to " + id1, privacyList.get(Random.nextInt(3)))
+        //              self ! PostPicture("album1", privacyList.get(Random.nextInt(2)))
+        //              self ! PostPicture("album2", privacyList.get(Random.nextInt(2)))
+        //              self ! GetMyPosts
         self ! GetTimeline(id1)
-//        self ! GetPictures(id1)
-//        self ! GetAlbum(id1, "album1")
-//        self ! GetAlbum(id1, "album2")
+      //        self ! GetPictures(id1)
+      //        self ! GetAlbum(id1, "album1")
+      //        self ! GetAlbum(id1, "album2")
 
       case CreateUser =>
 
@@ -293,136 +303,154 @@ object Client {
 
       case GetProfile(id1: String) =>
 
-        implicit val timeout = Timeout(10 seconds)
-        val future = IO(Http)(system).ask(HttpRequest(GET, Uri(s"http://" + serverIP + ":" + (serverPort) + "/profile/" + id1))).mapTo[HttpResponse]
+        if (authenticate().equals("true")) {
+          implicit val timeout = Timeout(10 seconds)
+          val future = IO(Http)(system).ask(HttpRequest(GET, Uri(s"http://" + serverIP + ":" + (serverPort) + "/profile/" + id1))).mapTo[HttpResponse]
 
-        val response = Await.result(future, timeout.duration)
+          val response = Await.result(future, timeout.duration)
 
-        val myObject: JSONObject = new JSONObject(response.entity.asString)
+          val myObject: JSONObject = new JSONObject(response.entity.asString)
 
-        if (!id.equalsIgnoreCase(id1)) {
-          val encryptedAESKey = getProfileKey(id, id1)
+          if (!id.equalsIgnoreCase(id1)) {
+            val encryptedAESKey = getProfileKey(id, id1)
 
-          val decryptedAESKey = decryptRSAPrivate(privateKey, encryptedAESKey)
+            val decryptedAESKey = decryptRSAPrivate(privateKey, encryptedAESKey)
 
-          println(id + " requested the below profile:\nName: " + decryptAES(decryptedAESKey, "RandomInitVector", myObject.getString("username")) + "\nAbout: " + decryptAES(decryptedAESKey, "RandomInitVector", myObject.getString("about")))
-        }
-        else {
-          println(id + " requested the below profile:\nName: " + decryptAES(profileKey, "RandomInitVector", myObject.getString("username")) + "\nAbout: " + decryptAES(profileKey, "RandomInitVector", myObject.getString("about")))
-        }
-
-      case GetTimeline(id1: String) =>
-
-        implicit val timeout = Timeout(10 seconds)
-
-        val future = IO(Http)(system).ask(HttpRequest(GET, Uri(s"http://" + serverIP + ":" + serverPort + "/timeline?sender=" + id + "&requested=" + id1))).mapTo[HttpResponse]
-
-        val response = Await.result(future, timeout.duration)
-
-//        println("response: GetTimeline raw: " + response.entity.asString)
-
-        val responseList: JSONArray = new JSONArray(response.entity.asString)
-
-        val i: Int = responseList.length()
-
-        for (x <- 0 until i) {
-
-          if (responseList.getJSONObject(x).getString("from").equalsIgnoreCase(responseList.getJSONObject(x).getString("to")) || responseList.getJSONObject(x).getString("from").equalsIgnoreCase(id)) {
-            var encryptedKey: String = ""
-            postAESKeyMap.get(responseList.getJSONObject
-            (x).getString("date")) match {
-              case Some(x) =>
-                encryptedKey = x
-            }
-            val decryptedKey = decryptRSAPrivate(privateKey, encryptedKey)
-
-            println("Decrypted Timeline Post#"+(x+1)+"\n" + "From: " + responseList.getJSONObject
-            (x).getString("from") + "\nTo: " + responseList.getJSONObject(x).getString("to") + "\nDate: " + responseList.getJSONObject(x).getString("date") + "\nContent: " + decryptAES(decryptedKey, "RandomInitVector", responseList.getJSONObject(x).getString("content")))
+            println(id + " requested the below profile:\nName: " + decryptAES(decryptedAESKey, "RandomInitVector", myObject.getString("username")) + "\nAbout: " + decryptAES(decryptedAESKey, "RandomInitVector", myObject.getString("about")))
           }
-
           else {
-            val encryptedKey = getAESKey(id, responseList.getJSONObject(x).getString("from"), responseList.getJSONObject(x).getString("date"))
-
-            val decryptedKey = decryptRSAPrivate(privateKey, encryptedKey)
-
-            println("Decrypted Timeline Post#"+(x+1)+"\n" + "From: " + responseList.getJSONObject(x).getString("from") + "\nTo: " + responseList.getJSONObject(x).getString("to") + "\nDate: " + responseList.getJSONObject(x).getString("date") + "\nContent: " + decryptAES(decryptedKey, "RandomInitVector", responseList.getJSONObject(x).getString("content")))
+            println(id + " requested the below profile:\nName: " + decryptAES(profileKey, "RandomInitVector", myObject.getString("username")) + "\nAbout: " + decryptAES(profileKey, "RandomInitVector", myObject.getString("about")))
           }
         }
+        else
+          println("You are not an authorized user")
+      case GetTimeline(id1: String) =>
+        if (authenticate().equals("true")) {
+          implicit val timeout = Timeout(10 seconds)
+
+          val future = IO(Http)(system).ask(HttpRequest(GET, Uri(s"http://" + serverIP + ":" + serverPort + "/timeline?sender=" + id + "&requested=" + id1))).mapTo[HttpResponse]
+
+          val response = Await.result(future, timeout.duration)
+
+          //        println("response: GetTimeline raw: " + response.entity.asString)
+
+          val responseList: JSONArray = new JSONArray(response.entity.asString)
+
+          val i: Int = responseList.length()
+
+          for (x <- 0 until i) {
+
+            if (responseList.getJSONObject(x).getString("from").equalsIgnoreCase(responseList.getJSONObject(x).getString("to")) || responseList.getJSONObject(x).getString("from").equalsIgnoreCase(id)) {
+              var encryptedKey: String = ""
+              postAESKeyMap.get(responseList.getJSONObject
+              (x).getString("date")) match {
+                case Some(x) =>
+                  encryptedKey = x
+              }
+              val decryptedKey = decryptRSAPrivate(privateKey, encryptedKey)
+
+              println("Decrypted Timeline Post#" + (x + 1) + "\n" + "From: " + responseList.getJSONObject
+              (x).getString("from") + "\nTo: " + responseList.getJSONObject(x).getString("to") + "\nDate: " + responseList.getJSONObject(x).getString("date") + "\nContent: " + decryptAES(decryptedKey, "RandomInitVector", responseList.getJSONObject(x).getString("content")))
+            }
+
+            else {
+              val encryptedKey = getAESKey(id, responseList.getJSONObject(x).getString("from"), responseList.getJSONObject(x).getString("date"))
+
+              val decryptedKey = decryptRSAPrivate(privateKey, encryptedKey)
+
+              println("Decrypted Timeline Post#" + (x + 1) + "\n" + "From: " + responseList.getJSONObject(x).getString("from") + "\nTo: " + responseList.getJSONObject(x).getString("to") + "\nDate: " + responseList.getJSONObject(x).getString("date") + "\nContent: " + decryptAES(decryptedKey, "RandomInitVector", responseList.getJSONObject(x).getString("content")))
+            }
+          }
+        }
+        else
+          println("You are not an authorized user")
 
       case PostMessage(friendID: String, content: String, privacy: String) =>
+        if (authenticate().equals("true")) {
+          val key = getSecureRandom
 
-        val key = getSecureRandom
+          val encryptedContent = encryptAES(key, "RandomInitVector", content)
 
-        val encryptedContent = encryptAES(key, "RandomInitVector", content)
+          val date1 = System.currentTimeMillis().toString
 
-        val date1 = System.currentTimeMillis().toString
+          postAESKeyMap += (date1 -> encryptRSAPublic(publicKey, key))
 
-        postAESKeyMap += (date1 -> encryptRSAPublic(publicKey, key))
+          val postJSON = new Post(date1, id, friendID, privacy, encryptedContent).toJson
 
-        val postJSON = new Post(date1, id, friendID, privacy, encryptedContent).toJson
+          implicit val timeout = Timeout(10 seconds)
 
-        implicit val timeout = Timeout(10 seconds)
+          val future = IO(Http)(system).ask(HttpRequest(POST, Uri(s"http://" + serverIP + ":" + serverPort + "/post")).withEntity(HttpEntity(ContentType(MediaTypes.`application/json`), postJSON.toString()))).mapTo[HttpResponse]
 
-        val future = IO(Http)(system).ask(HttpRequest(POST, Uri(s"http://" + serverIP + ":" + serverPort + "/post")).withEntity(HttpEntity(ContentType(MediaTypes.`application/json`), postJSON.toString()))).mapTo[HttpResponse]
+          val response = Await.result(future, timeout.duration)
 
-        val response = Await.result(future, timeout.duration)
-
-        println("response: PostMessage by "+id+" to "+friendID+": " + response.entity.asString)
+          println("response: PostMessage by " + id + " to " + friendID + ": " + response.entity.asString)
+        }
+        else
+          println("You are not an authorized user")
 
       case GetMyPosts =>
+        if (authenticate().equals("true")) {
+          implicit val timeout = Timeout(10 seconds)
+          val future = IO(Http)(system).ask(HttpRequest(GET, Uri(s"http://" + serverIP + ":" + serverPort + "/post/" + id))).mapTo[HttpResponse]
 
-        implicit val timeout = Timeout(10 seconds)
-        val future = IO(Http)(system).ask(HttpRequest(GET, Uri(s"http://" + serverIP + ":" + serverPort + "/post/" + id))).mapTo[HttpResponse]
+          val response = Await.result(future, timeout.duration)
 
-        val response = Await.result(future, timeout.duration)
+          val responseList: JSONArray = new JSONArray(response.entity.asString)
 
-        val responseList: JSONArray = new JSONArray(response.entity.asString)
+          val i: Int = responseList.length()
 
-        val i: Int = responseList.length()
+          for (x <- 0 until i) {
 
-        for (x <- 0 until i) {
+            if (responseList.getJSONObject(x).getString("from").equalsIgnoreCase(responseList.getJSONObject(x).getString("to")) || responseList.getJSONObject(x).getString("from").equalsIgnoreCase(id)) {
+              var encryptedKey: String = ""
+              postAESKeyMap.get(responseList.getJSONObject(x).getString("date")) match {
+                case Some(x) =>
+                  encryptedKey = x
+              }
+              val decryptedKey = decryptRSAPrivate(privateKey, encryptedKey)
 
-          if (responseList.getJSONObject(x).getString("from").equalsIgnoreCase(responseList.getJSONObject(x).getString("to")) || responseList.getJSONObject(x).getString("from").equalsIgnoreCase(id)) {
-            var encryptedKey: String = ""
-            postAESKeyMap.get(responseList.getJSONObject(x).getString("date")) match {
-              case Some(x) =>
-                encryptedKey = x
+              println("Post:\n" + "From: " + responseList.getJSONObject(x).getString("from") + "\nTo: " + responseList.getJSONObject(x).getString("to") + "\nDate: " + responseList.getJSONObject(x).getString("date") + "\nContent: " + decryptAES(decryptedKey, "RandomInitVector", responseList.getJSONObject(x).getString("content")))
             }
-            val decryptedKey = decryptRSAPrivate(privateKey, encryptedKey)
 
-            println("Post:\n" + "From: " + responseList.getJSONObject(x).getString("from") + "\nTo: " + responseList.getJSONObject(x).getString("to") + "\nDate: " + responseList.getJSONObject(x).getString("date") + "\nContent: " + decryptAES(decryptedKey, "RandomInitVector", responseList.getJSONObject(x).getString("content")))
-          }
+            else {
+              val encryptedKey = getAESKey(id, responseList.getJSONObject(x).getString("from"), responseList.getJSONObject(x).getString("date"))
 
-          else {
-            val encryptedKey = getAESKey(id, responseList.getJSONObject(x).getString("from"), responseList.getJSONObject(x).getString("date"))
+              val decryptedKey = decryptRSAPrivate(privateKey, encryptedKey)
 
-            val decryptedKey = decryptRSAPrivate(privateKey, encryptedKey)
-
-            println("Post:\n" + "From: " + responseList.getJSONObject(x).getString("from") + "\nTo: " + responseList.getJSONObject(x).getString("to") + "\nDate: " + responseList.getJSONObject(x).getString("date") + "\nContent: " + decryptAES(decryptedKey, "RandomInitVector", responseList.getJSONObject(x).getString("content")))
+              println("Post:\n" + "From: " + responseList.getJSONObject(x).getString("from") + "\nTo: " + responseList.getJSONObject(x).getString("to") + "\nDate: " + responseList.getJSONObject(x).getString("date") + "\nContent: " + decryptAES(decryptedKey, "RandomInitVector", responseList.getJSONObject(x).getString("content")))
+            }
           }
         }
+        else
+          println("You are not an authorized user")
 
       case MakeFriend(id1: String) =>
+        if (authenticate().equals("true")) {
+          implicit val timeout = Timeout(10 seconds)
 
-        implicit val timeout = Timeout(10 seconds)
+          val friendRequestJSON = new FriendRequest(id, id1).toJson
 
-        val friendRequestJSON = new FriendRequest(id, id1).toJson
+          val future = IO(Http)(system).ask(HttpRequest(POST, Uri(s"http://" + serverIP + ":" + serverPort + "/makefriend")).withEntity(HttpEntity(ContentType(MediaTypes.`application/json`), friendRequestJSON.toString()))).mapTo[HttpResponse]
 
-        val future = IO(Http)(system).ask(HttpRequest(POST, Uri(s"http://" + serverIP + ":" + serverPort + "/makefriend")).withEntity(HttpEntity(ContentType(MediaTypes.`application/json`), friendRequestJSON.toString()))).mapTo[HttpResponse]
+          val response = Await.result(future, timeout.duration)
 
-        val response = Await.result(future, timeout.duration)
-
-        println("response: MakeFriend: " + id + " is making friends with " + id1 + " " + response.entity.asString)
+          println("response: MakeFriend: " + id + " is making friends with " + id1 + " " + response.entity.asString)
+        }
+        else
+          println("You are not an authorized user")
 
       case GetFriendList(id1: String) =>
+        if (authenticate().equals("true")) {
+          implicit val timeout = Timeout(10 seconds)
 
-        implicit val timeout = Timeout(10 seconds)
+          val future = IO(Http)(system).ask(HttpRequest(GET, Uri(s"http://" + serverIP + ":" + serverPort + "/getfriends/" + id1))).mapTo[HttpResponse]
 
-        val future = IO(Http)(system).ask(HttpRequest(GET, Uri(s"http://" + serverIP + ":" + serverPort + "/getfriends/" + id1))).mapTo[HttpResponse]
+          val response = Await.result(future, timeout.duration)
 
-        val response = Await.result(future, timeout.duration)
-
-        println("response: GetFriendList: " + id + " is getting " + id1 + "'s friends "+response.entity.asString)
+          println("response: GetFriendList: " + id + " is getting " + id1 + "'s friends " + response.entity.asString)
+        }
+        else
+          println("You are not an authorized user")
 
       case PostPicture(albumID: String, privacy: String) =>
 
